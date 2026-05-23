@@ -153,19 +153,31 @@
             color: var(--white);
         }
 
-        .badge-effort-spontane {
-            background: #D4EDDA;
-            color: #155724;
+        .badge-logistics-spontane {
+            background: var(--sage);
+            color: var(--white);
         }
 
-        .badge-effort-reserver {
-            background: #FFF3CD;
-            color: #856404;
+        .badge-logistics-reserver {
+            background: var(--amber);
+            color: var(--white);
         }
 
-        .badge-effort-planifier {
-            background: #F8D7DA;
-            color: #721C24;
+        .badge-logistics-planifier {
+            background: #C0392B;
+            color: var(--white);
+        }
+
+        .suggestion-emoji {
+            font-size: 1.5rem;
+            margin-right: 0.5rem;
+        }
+
+        .intro-text {
+            font-size: 1.1rem;
+            color: #555;
+            margin-bottom: 1.5rem;
+            font-style: italic;
         }
 
         .feedback-buttons {
@@ -362,18 +374,23 @@
         <!-- Suggestions Claude -->
         <h2 class="section-title">Suggestions pour ce week-end</h2>
 
+        {% if intro %}
+        <p class="intro-text">{{ intro }}</p>
+        {% endif %}
+
         <div class="suggestions">
             {% if suggestions %}
                 {% for suggestion in suggestions %}
                 <article class="suggestion-card">
-                    <h3>{{ suggestion.title }}</h3>
+                    <h3><span class="suggestion-emoji">{{ suggestion.emoji }}</span>{{ suggestion.title }}</h3>
                     <p class="description">{{ suggestion.description }}</p>
                     <div class="suggestion-meta">
                         {% if suggestion.day %}
-                        <span class="badge badge-day">{{ suggestion.day }}</span>
+                        <span class="badge badge-day">📅 {{ suggestion.day }}</span>
                         {% endif %}
-                        {% if suggestion.effort %}
-                        <span class="badge badge-effort-{{ suggestion.effort_class }}">{{ suggestion.effort }}</span>
+                        {% if suggestion.logistics %}
+                        {% set logistics_class = 'spontane' if 'Spontané' in suggestion.logistics else ('reserver' if 'réserver' in suggestion.logistics else 'planifier') %}
+                        <span class="badge badge-logistics-{{ logistics_class }}">⚡ {{ suggestion.logistics }}</span>
                         {% endif %}
                     </div>
                     <div class="feedback-buttons">

@@ -1,4 +1,5 @@
 import anthropic
+import json
 from datetime import datetime
 from typing import Dict, List
 
@@ -21,7 +22,10 @@ pas trop formel.
 Pour les suggestions de randonnée, utilise UNIQUEMENT
 les données Visorando fournies. Ne jamais inventer
 de randonnée. Si aucune donnée n'est disponible,
-ne propose pas de randonnée."""
+ne propose pas de randonnée.
+
+IMPORTANT : Tu dois répondre UNIQUEMENT en JSON valide,
+sans markdown, sans texte avant ou après. Pas de ```json, juste le JSON brut."""
 
 
 def _format_weather_context(weather_data: Dict) -> str:
@@ -136,12 +140,26 @@ Mode : {period['mode']}"""
     hiking_context = _format_hiking_context(hikes)
 
     request = """Propose 3 à 5 suggestions pour cette période.
-Chaque suggestion doit avoir :
-- Un titre accrocheur
-- Une description de 3-4 phrases expliquant l'activité
-- Le jour recommandé (ou "flexible")
-- Pourquoi c'est adapté à la météo
-- Un niveau d'effort logistique : spontané / à réserver / à planifier
+
+Réponds UNIQUEMENT en JSON valide avec ce format exact :
+{
+  "intro": "phrase d'accroche courte pour le week-end",
+  "suggestions": [
+    {
+      "emoji": "🎬",
+      "title": "Titre accrocheur",
+      "description": "Description de 3-4 phrases expliquant l'activité et pourquoi c'est adapté à la météo.",
+      "day": "Samedi",
+      "logistics": "Spontané",
+      "type": "cinema"
+    }
+  ]
+}
+
+Valeurs possibles :
+- day : "Samedi", "Dimanche", "Lundi", "Flexible"
+- logistics : "Spontané", "À réserver", "À planifier"
+- type : "cinema", "rando", "culture", "gastronomie", "autre"
 
 Privilégie la variété : mélange cinéma, randonnée, culture, gastronomie si possible."""
 
@@ -184,15 +202,42 @@ def generate_suggestions(period: Dict) -> Dict:
         ]
     )
 
-    suggestions_text = message.content[0].text
+    raw_response = message.content[0].text
 
-    # 4. Retourner le résultat
+    # 4. Parser le JSON
+    suggestions = []
+    intro = ""
+    suggestions_text = raw_response  # Fallback
+
+    try:
+        # Nettoyer les éventuels backticks markdown
+        clean = raw_response.strip()
+        if clean.startswith("```"):
+            clean = clean.lstrip("```json").lstrip("```")
+        if clean.endswith("```"):
+            clean = clean.rstrip("```")
+        clean = clean.strip()
+
+        result = json.loads(clean)
+        suggestions = result.get("suggestions", [])
+        intro = result.get("intro", "")
+        suggestions_text = None  # Plus besoin du texte brut
+
+    except json.JSONDecodeError as e:
+        print(f"  ⚠ Erreur parsing JSON Claude: {e}")
+        print(f"  Réponse brute: {raw_response[:200]}...")
+        # Fallback : on garde le texte brut
+        suggestions = []
+
+    # 5. Retourner le résultat
     return {
         "period": period,
         "weather": weather_data,
         "movies": movies[:5],
         "events": events_list[:8],
         "hikes": hikes[:3],
+        "suggestions": suggestions,
+        "intro": intro,
         "suggestions_text": suggestions_text,
         "generated_at": datetime.now()
     }

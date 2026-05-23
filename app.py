@@ -1,5 +1,5 @@
 from flask import Flask, render_template, Response
-import re
+import json
 import config
 from engine import calendar_engine
 from engine import suggest
@@ -7,63 +7,6 @@ from collectors import weather, cinema, events, hiking
 
 app = Flask(__name__)
 app.secret_key = config.FLASK_SECRET_KEY
-
-
-def parse_suggestions(text: str) -> list:
-    """Parse le texte de suggestions Claude en liste structurée."""
-    suggestions = []
-
-    # Séparer par ## (titres markdown)
-    parts = re.split(r'\n##\s+', text)
-
-    for part in parts:
-        part = part.strip()
-        if not part or len(part) < 20:
-            continue
-
-        suggestion = {"title": "", "description": "", "day": "", "effort": "", "effort_class": ""}
-
-        lines = part.split('\n')
-
-        # Premier élément = titre (avec emoji potentiel)
-        if lines:
-            title_line = lines[0].strip()
-            # Nettoyer le titre (enlever ** markdown)
-            title_line = re.sub(r'\*\*', '', title_line)
-            suggestion["title"] = title_line
-
-        # Chercher le jour recommandé
-        day_match = re.search(r'\*\*Jour recommandé\*\*\s*:\s*(.+?)(?:\n|$)', part, re.IGNORECASE)
-        if day_match:
-            suggestion["day"] = day_match.group(1).strip()
-
-        # Chercher l'effort logistique
-        effort_match = re.search(r'\*\*(?:Effort logistique|Effort)\*\*\s*:\s*(.+?)(?:\n|$)', part, re.IGNORECASE)
-        if effort_match:
-            effort = effort_match.group(1).strip()
-            suggestion["effort"] = effort
-            if "spontan" in effort.lower():
-                suggestion["effort_class"] = "spontane"
-            elif "réserv" in effort.lower() or "reserv" in effort.lower():
-                suggestion["effort_class"] = "reserver"
-            else:
-                suggestion["effort_class"] = "planifier"
-
-        # Description = tout sauf les lignes de métadonnées
-        desc_lines = []
-        for line in lines[1:]:
-            line = line.strip()
-            if line.startswith("- **") or line.startswith("**Jour") or line.startswith("**Météo") or line.startswith("**Effort"):
-                continue
-            if line and not line.startswith("-"):
-                desc_lines.append(line)
-
-        suggestion["description"] = " ".join(desc_lines).strip()
-
-        if suggestion["title"]:
-            suggestions.append(suggestion)
-
-    return suggestions
 
 
 def prepare_movies_for_template(movies: list) -> list:
@@ -105,13 +48,15 @@ def index():
                                period=None,
                                weather=None,
                                suggestions=[],
+                               intro="",
                                movies=[],
                                hikes=[],
                                show_hiking=False,
                                generated_at=result.get("generated_at"))
 
-    # Parser les suggestions
-    suggestions = parse_suggestions(result.get("suggestions_text", ""))
+    # Suggestions structurées (déjà parsées depuis JSON)
+    suggestions = result.get("suggestions", [])
+    intro = result.get("intro", "")
 
     # Préparer les films
     movies = prepare_movies_for_template(result.get("movies", []))
@@ -126,6 +71,7 @@ def index():
                            period=result["period"],
                            weather=weather_data,
                            suggestions=suggestions,
+                           intro=intro,
                            movies=movies,
                            hikes=result.get("hikes", [])[:3],
                            show_hiking=show_hiking,
@@ -134,22 +80,23 @@ def index():
 
 @app.route("/suggest")
 def suggest_route():
-    """Endpoint debug : suggestions en texte brut."""
+    """Endpoint debug : suggestions en JSON."""
     result = suggest.get_suggestions_for_next_period()
 
     if result.get("error"):
-        return Response(f"Erreur : {result['error']}", mimetype="text/plain; charset=utf-8")
+        return Response(json.dumps({"error": result["error"]}, ensure_ascii=False),
+                        mimetype="application/json; charset=utf-8")
 
-    output = f"""SUGGESTIONS WEEKEND ASSISTANT
-{'='*50}
-Période : {result['period']['label']}
-Du {result['period']['start'].strftime('%d/%m/%Y')} au {result['period']['end'].strftime('%d/%m/%Y')}
-Généré le : {result['generated_at'].strftime('%d/%m/%Y à %H:%M')}
-{'='*50}
-
-{result['suggestions_text']}
-"""
-    return Response(output, mimetype="text/plain; charset=utf-8")
+    output = {
+        "period": result["period"]["label"],
+        "dates": f"{result['period']['start'].strftime('%d/%m/%Y')} - {result['period']['end'].strftime('%d/%m/%Y')}",
+        "generated_at": result["generated_at"].strftime("%d/%m/%Y %H:%M"),
+        "intro": result.get("intro", ""),
+        "suggestions": result.get("suggestions", []),
+        "fallback_text": result.get("suggestions_text")  # None si JSON parsé OK
+    }
+    return Response(json.dumps(output, ensure_ascii=False, indent=2),
+                    mimetype="application/json; charset=utf-8")
 
 
 def display_weather_forecast(forecast: dict) -> None:
