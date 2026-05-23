@@ -1,0 +1,300 @@
+from flask import Flask, render_template, Response
+import re
+import config
+from engine import calendar_engine
+from engine import suggest
+from collectors import weather, cinema, events, hiking
+
+app = Flask(__name__)
+app.secret_key = config.FLASK_SECRET_KEY
+
+
+def parse_suggestions(text: str) -> list:
+    """Parse le texte de suggestions Claude en liste structurée."""
+    suggestions = []
+
+    # Séparer par ## (titres markdown)
+    parts = re.split(r'\n##\s+', text)
+
+    for part in parts:
+        part = part.strip()
+        if not part or len(part) < 20:
+            continue
+
+        suggestion = {"title": "", "description": "", "day": "", "effort": "", "effort_class": ""}
+
+        lines = part.split('\n')
+
+        # Premier élément = titre (avec emoji potentiel)
+        if lines:
+            title_line = lines[0].strip()
+            # Nettoyer le titre (enlever ** markdown)
+            title_line = re.sub(r'\*\*', '', title_line)
+            suggestion["title"] = title_line
+
+        # Chercher le jour recommandé
+        day_match = re.search(r'\*\*Jour recommandé\*\*\s*:\s*(.+?)(?:\n|$)', part, re.IGNORECASE)
+        if day_match:
+            suggestion["day"] = day_match.group(1).strip()
+
+        # Chercher l'effort logistique
+        effort_match = re.search(r'\*\*(?:Effort logistique|Effort)\*\*\s*:\s*(.+?)(?:\n|$)', part, re.IGNORECASE)
+        if effort_match:
+            effort = effort_match.group(1).strip()
+            suggestion["effort"] = effort
+            if "spontan" in effort.lower():
+                suggestion["effort_class"] = "spontane"
+            elif "réserv" in effort.lower() or "reserv" in effort.lower():
+                suggestion["effort_class"] = "reserver"
+            else:
+                suggestion["effort_class"] = "planifier"
+
+        # Description = tout sauf les lignes de métadonnées
+        desc_lines = []
+        for line in lines[1:]:
+            line = line.strip()
+            if line.startswith("- **") or line.startswith("**Jour") or line.startswith("**Météo") or line.startswith("**Effort"):
+                continue
+            if line and not line.startswith("-"):
+                desc_lines.append(line)
+
+        suggestion["description"] = " ".join(desc_lines).strip()
+
+        if suggestion["title"]:
+            suggestions.append(suggestion)
+
+    return suggestions
+
+
+def prepare_movies_for_template(movies: list) -> list:
+    """Prépare les films pour le template."""
+    if not movies:
+        return []
+
+    grouped = cinema.group_movies_by_title(movies)
+    result = []
+
+    for movie in grouped[:5]:
+        if movie.get("family_film"):
+            continue
+
+        cinemas_display = cinema.format_cinemas_line(movie.get("cinemas", []))
+
+        result.append({
+            "title": movie["title"],
+            "director": movie.get("director", ""),
+            "press_rating": movie.get("press_rating"),
+            "telerama_pick": movie.get("telerama_pick", False),
+            "telerama_stars": movie.get("telerama_stars"),
+            "cahiers_pick": movie.get("cahiers_pick", False),
+            "cinemas_display": cinemas_display,
+            "allocine_url": movie.get("allocine_url", "")
+        })
+
+    return result
+
+
+@app.route("/")
+def index():
+    """Page principale avec les suggestions."""
+    result = suggest.get_suggestions_for_next_period()
+
+    if result.get("error"):
+        return render_template("index.html",
+                               error=result["error"],
+                               period=None,
+                               weather=None,
+                               suggestions=[],
+                               movies=[],
+                               hikes=[],
+                               show_hiking=False,
+                               generated_at=result.get("generated_at"))
+
+    # Parser les suggestions
+    suggestions = parse_suggestions(result.get("suggestions_text", ""))
+
+    # Préparer les films
+    movies = prepare_movies_for_template(result.get("movies", []))
+
+    # Vérifier si on affiche les randonnées (au moins un jour favorable)
+    weather_data = result.get("weather", {})
+    show_hiking = False
+    if weather_data.get("days"):
+        show_hiking = any(d.get("suitable_outdoor", False) for d in weather_data["days"])
+
+    return render_template("index.html",
+                           period=result["period"],
+                           weather=weather_data,
+                           suggestions=suggestions,
+                           movies=movies,
+                           hikes=result.get("hikes", [])[:3],
+                           show_hiking=show_hiking,
+                           generated_at=result["generated_at"])
+
+
+@app.route("/suggest")
+def suggest_route():
+    """Endpoint debug : suggestions en texte brut."""
+    result = suggest.get_suggestions_for_next_period()
+
+    if result.get("error"):
+        return Response(f"Erreur : {result['error']}", mimetype="text/plain; charset=utf-8")
+
+    output = f"""SUGGESTIONS WEEKEND ASSISTANT
+{'='*50}
+Période : {result['period']['label']}
+Du {result['period']['start'].strftime('%d/%m/%Y')} au {result['period']['end'].strftime('%d/%m/%Y')}
+Généré le : {result['generated_at'].strftime('%d/%m/%Y à %H:%M')}
+{'='*50}
+
+{result['suggestions_text']}
+"""
+    return Response(output, mimetype="text/plain; charset=utf-8")
+
+
+def display_weather_forecast(forecast: dict) -> None:
+    """Affiche les prévisions météo de manière formatée."""
+    print(f"\n{'='*50}")
+    print(f"MÉTÉO - {forecast['location']}")
+    print(f"Période : {forecast['period_label']}")
+    print(f"{'='*50}")
+
+    if forecast.get("error"):
+        print(f"⚠ Erreur : {forecast['error']}")
+        return
+
+    for day in forecast["days"]:
+        outdoor = "✓" if day["suitable_outdoor"] else "✗"
+        print(f"\n{day['label']} ({day['date']})")
+        print(f"  Températures : {day['temp_min']}°C — {day['temp_max']}°C")
+        print(f"  Conditions   : {day['description']}")
+        print(f"  Pluie        : {day['rain_mm']} mm")
+        print(f"  Sortie       : {outdoor}")
+
+    print(f"\n{'—'*50}")
+    print(f"Résumé     : {forecast['summary']}")
+    print(f"Meilleur   : {forecast['best_day']}")
+    print(f"{'='*50}\n")
+
+
+def display_cinema_movies(movies: list) -> None:
+    """Affiche les films cinéma de manière formatée."""
+    print(f"\n{'='*50}")
+    print("CINÉMA - Films Art & Essai")
+    print(f"{'='*50}")
+
+    if not movies:
+        print("Aucun film trouvé pour cette période")
+        return
+
+    # Résumé
+    summary = cinema.get_movies_summary(movies)
+
+    # Sources éditoriales
+    print(f"\n{cinema.get_editorial_sources_line()}")
+
+    print(f"\nFilms : {summary['unique_films']} uniques ({summary['total_entries']} entrées)")
+    for cinema_name, count in summary["by_cinema"].items():
+        print(f"  • {cinema_name} : {count}")
+
+    # Top 3 films (groupés par titre)
+    print(f"\n{'—'*50}")
+    print("TOP 3 FILMS")
+    print(f"{'—'*50}")
+
+    for i, movie in enumerate(summary["top_movies"], 1):
+        rating = movie["press_rating"] or "N/A"
+        if isinstance(rating, float):
+            rating = f"{rating:.1f}/5"
+
+        # Labels éditoriaux
+        labels = []
+        if movie.get("telerama_pick") and movie.get("cahiers_pick"):
+            stars = movie.get("telerama_stars") or 0
+            labels.append(f"★★ Télérama {'★' * stars} + Cahiers")
+        elif movie.get("telerama_pick"):
+            stars = movie.get("telerama_stars") or 0
+            labels.append(f"★ Télérama {'★' * stars}")
+        elif movie.get("cahiers_pick"):
+            labels.append("★ Cahiers")
+        if movie["art_et_essai"]:
+            labels.append("Art & Essai")
+        label_str = f" [{', '.join(labels)}]" if labels else ""
+
+        # Ligne cinémas groupés
+        cinemas_line = cinema.format_cinemas_line(movie.get("cinemas", []))
+
+        print(f"\n{i}. {movie['title']}{label_str}")
+        if movie["director"]:
+            print(f"   Réalisateur : {movie['director']}")
+        print(f"   Note presse : {rating}")
+        print(f"   Où           : {cinemas_line}")
+
+    print(f"\n{'='*50}\n")
+
+
+def display_events(events_list: list) -> None:
+    """Affiche les événements de manière formatée."""
+    print(f"\n{'='*50}")
+    print("ÉVÉNEMENTS LOCAUX")
+    print(f"{'='*50}")
+
+    if not events_list:
+        print("Aucun événement trouvé pour cette période")
+        return
+
+    summary = events.get_events_summary(events_list)
+
+    # Sources
+    print(f"\nSources : {events.get_sources_line()}")
+    print(f"Total : {summary['total']} événements")
+
+    # Par catégorie
+    if summary["by_category"]:
+        cats = ", ".join([f"{cat} ({count})" for cat, count in summary["by_category"].items()])
+        print(f"Catégories : {cats}")
+
+    # Top 5 événements
+    print(f"\n{'—'*50}")
+    print("TOP 5 ÉVÉNEMENTS")
+    print(f"{'—'*50}")
+
+    for i, event in enumerate(summary["top_events"], 1):
+        score_bar = "●" * int(event["score"] * 5) + "○" * (5 - int(event["score"] * 5))
+        category = event.get("category", "autre").upper()
+
+        print(f"\n{i}. [{category}] {event['title']}")
+        print(f"   Lieu     : {event.get('city', 'NC')} ({event.get('distance_km', 0):.0f} km)")
+        print(f"   Prix     : {event.get('price', 'NC')}")
+        print(f"   Score    : {score_bar} ({event['score']:.2f})")
+
+    print(f"\n{'='*50}\n")
+
+
+if __name__ == "__main__":
+    # Affiche la prochaine période au démarrage
+    next_period = calendar_engine.get_next_period()
+    if next_period:
+        print(f"\n{'='*50}")
+        print(f"Prochaine période : {next_period['label']}")
+        print(f"Du {next_period['start'].strftime('%d/%m/%Y')} au {next_period['end'].strftime('%d/%m/%Y')}")
+        print(f"Durée : {next_period['days']} jours ({next_period['mode']})")
+        print(f"{'='*50}")
+
+        # Test météo
+        forecast = weather.get_weather_forecast(next_period)
+        display_weather_forecast(forecast)
+
+        # Test cinéma
+        movies = cinema.get_artetal_movies(next_period)
+        display_cinema_movies(movies)
+
+        # Test événements
+        local_events = events.get_local_events(next_period)
+        display_events(local_events)
+
+        # Test randonnées
+        hikes = hiking.get_hiking_suggestions(next_period, forecast)
+        hiking.display_hiking_suggestions(hikes)
+
+    app.run(debug=True)

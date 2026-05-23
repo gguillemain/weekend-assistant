@@ -1,0 +1,7 @@
+flask
+anthropic
+requests
+python-dotenv
+apscheduler
+beautifulsoup4
+lxml

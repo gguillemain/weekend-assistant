@@ -1,0 +1,23 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python3 -m venv:*)",
+      "Bash(source:*)",
+      "Bash(pip install:*)",
+      "Bash(timeout 3 python:*)",
+      "Bash(python -c:*)",
+      "Bash(python app.py:*)",
+      "WebFetch(domain:www.allocine.fr)",
+      "WebSearch",
+      "WebFetch(domain:www.telerama.fr)",
+      "Bash(curl:*)",
+      "Bash(pkill:*)",
+      "Bash(python -m flask run:*)",
+      "Bash(lsof:*)",
+      "Bash(xargs kill:*)",
+      "WebFetch(domain:www.visorando.com)",
+      "Bash(git init:*)",
+      "Bash(git add:*)"
+    ]
+  }
+}

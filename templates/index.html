@@ -1,0 +1,450 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Weekend Assistant</title>
+    <style>
+        :root {
+            --bg: #FAFAF8;
+            --sage: #7C9A7E;
+            --sage-light: #9DB89F;
+            --anthracite: #2C2C2C;
+            --amber: #E8A838;
+            --white: #FFFFFF;
+            --gray-light: #E5E5E3;
+            --gray: #888;
+            --red: #D64545;
+            --green: #4CAF50;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: var(--bg);
+            color: var(--anthracite);
+            line-height: 1.6;
+            padding-bottom: 3rem;
+        }
+
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 0 1rem;
+        }
+
+        /* Header */
+        header {
+            background: var(--sage);
+            color: var(--white);
+            padding: 1.5rem 0;
+            margin-bottom: 2rem;
+        }
+
+        header h1 {
+            font-size: 1.8rem;
+            font-weight: 600;
+            margin-bottom: 0.25rem;
+        }
+
+        .period-label {
+            font-size: 1.1rem;
+            opacity: 0.9;
+        }
+
+        /* Weather bar */
+        .weather-bar {
+            display: flex;
+            gap: 1rem;
+            margin-top: 1rem;
+            flex-wrap: wrap;
+        }
+
+        .weather-day {
+            background: rgba(255,255,255,0.15);
+            border-radius: 8px;
+            padding: 0.5rem 0.75rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-size: 0.9rem;
+        }
+
+        .weather-day .day-name {
+            font-weight: 600;
+        }
+
+        .weather-day .temps {
+            opacity: 0.9;
+        }
+
+        .weather-indicator {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+        }
+
+        .weather-indicator.good {
+            background: var(--green);
+        }
+
+        .weather-indicator.bad {
+            background: var(--red);
+        }
+
+        /* Section titles */
+        .section-title {
+            font-size: 1.3rem;
+            font-weight: 600;
+            color: var(--sage);
+            margin: 2rem 0 1rem;
+            padding-bottom: 0.5rem;
+            border-bottom: 2px solid var(--gray-light);
+        }
+
+        /* Suggestion cards */
+        .suggestions {
+            display: flex;
+            flex-direction: column;
+            gap: 1.5rem;
+        }
+
+        .suggestion-card {
+            background: var(--white);
+            border-radius: 12px;
+            padding: 1.5rem;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+        }
+
+        .suggestion-card h3 {
+            font-size: 1.25rem;
+            margin-bottom: 0.75rem;
+            color: var(--anthracite);
+        }
+
+        .suggestion-card .description {
+            color: #444;
+            margin-bottom: 1rem;
+            white-space: pre-line;
+        }
+
+        .suggestion-meta {
+            display: flex;
+            gap: 0.5rem;
+            flex-wrap: wrap;
+            margin-bottom: 1rem;
+        }
+
+        .badge {
+            display: inline-block;
+            padding: 0.25rem 0.6rem;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            font-weight: 500;
+        }
+
+        .badge-day {
+            background: var(--sage-light);
+            color: var(--white);
+        }
+
+        .badge-effort-spontane {
+            background: #D4EDDA;
+            color: #155724;
+        }
+
+        .badge-effort-reserver {
+            background: #FFF3CD;
+            color: #856404;
+        }
+
+        .badge-effort-planifier {
+            background: #F8D7DA;
+            color: #721C24;
+        }
+
+        .feedback-buttons {
+            display: flex;
+            gap: 0.5rem;
+        }
+
+        .feedback-btn {
+            border: none;
+            background: var(--gray-light);
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            cursor: pointer;
+            font-size: 1rem;
+            transition: transform 0.1s;
+        }
+
+        .feedback-btn:hover {
+            transform: scale(1.1);
+        }
+
+        .feedback-btn.like {
+            background: #D4EDDA;
+        }
+
+        .feedback-btn.dislike {
+            background: #E5E5E3;
+        }
+
+        /* Film cards */
+        .films-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+            gap: 1rem;
+        }
+
+        .film-card {
+            background: var(--white);
+            border-radius: 10px;
+            padding: 1rem;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.05);
+        }
+
+        .film-card h4 {
+            font-size: 1rem;
+            margin-bottom: 0.25rem;
+            color: var(--anthracite);
+        }
+
+        .film-card .director {
+            font-size: 0.85rem;
+            color: var(--gray);
+            margin-bottom: 0.5rem;
+        }
+
+        .film-card .film-meta {
+            font-size: 0.85rem;
+            color: #555;
+        }
+
+        .film-card .telerama {
+            color: var(--amber);
+            font-weight: 600;
+        }
+
+        .film-card .cinemas {
+            font-size: 0.8rem;
+            color: var(--gray);
+            margin-top: 0.5rem;
+        }
+
+        .film-card a {
+            color: var(--sage);
+            text-decoration: none;
+            font-size: 0.8rem;
+        }
+
+        .film-card a:hover {
+            text-decoration: underline;
+        }
+
+        /* Hiking cards */
+        .hiking-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+            gap: 1rem;
+        }
+
+        .hike-card {
+            background: var(--white);
+            border-radius: 10px;
+            padding: 1rem;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.05);
+        }
+
+        .hike-card h4 {
+            font-size: 0.95rem;
+            margin-bottom: 0.5rem;
+            color: var(--anthracite);
+        }
+
+        .hike-card .hike-meta {
+            font-size: 0.85rem;
+            color: #555;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.75rem;
+        }
+
+        .hike-card .hike-meta span {
+            display: flex;
+            align-items: center;
+            gap: 0.25rem;
+        }
+
+        .hike-card .start {
+            font-size: 0.8rem;
+            color: var(--gray);
+            margin-top: 0.5rem;
+        }
+
+        .hike-card a {
+            color: var(--sage);
+            text-decoration: none;
+            font-size: 0.8rem;
+        }
+
+        .hike-card a:hover {
+            text-decoration: underline;
+        }
+
+        /* Footer */
+        footer {
+            text-align: center;
+            padding: 2rem 1rem;
+            color: var(--gray);
+            font-size: 0.85rem;
+        }
+
+        /* No data message */
+        .no-data {
+            color: var(--gray);
+            font-style: italic;
+            padding: 1rem 0;
+        }
+
+        /* Responsive */
+        @media (max-width: 600px) {
+            header h1 {
+                font-size: 1.5rem;
+            }
+
+            .weather-bar {
+                gap: 0.5rem;
+            }
+
+            .weather-day {
+                padding: 0.4rem 0.6rem;
+                font-size: 0.8rem;
+            }
+
+            .suggestion-card {
+                padding: 1rem;
+            }
+
+            .suggestion-card h3 {
+                font-size: 1.1rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <div class="container">
+            <h1>Weekend Assistant</h1>
+            <p class="period-label">{{ period.label }} · {{ period.start.strftime('%d') }} au {{ period.end.strftime('%d %B %Y') }}</p>
+
+            {% if weather and weather.days %}
+            <div class="weather-bar">
+                {% for day in weather.days %}
+                <div class="weather-day">
+                    <span class="weather-indicator {{ 'good' if day.suitable_outdoor else 'bad' }}"></span>
+                    <span class="day-name">{{ day.label[:3] }}</span>
+                    <span class="temps">{{ day.temp_min|int }}° / {{ day.temp_max|int }}°</span>
+                </div>
+                {% endfor %}
+            </div>
+            {% endif %}
+        </div>
+    </header>
+
+    <main class="container">
+        <!-- Suggestions Claude -->
+        <h2 class="section-title">Suggestions pour ce week-end</h2>
+
+        <div class="suggestions">
+            {% if suggestions %}
+                {% for suggestion in suggestions %}
+                <article class="suggestion-card">
+                    <h3>{{ suggestion.title }}</h3>
+                    <p class="description">{{ suggestion.description }}</p>
+                    <div class="suggestion-meta">
+                        {% if suggestion.day %}
+                        <span class="badge badge-day">{{ suggestion.day }}</span>
+                        {% endif %}
+                        {% if suggestion.effort %}
+                        <span class="badge badge-effort-{{ suggestion.effort_class }}">{{ suggestion.effort }}</span>
+                        {% endif %}
+                    </div>
+                    <div class="feedback-buttons">
+                        <button class="feedback-btn like" title="J'aime">👍</button>
+                        <button class="feedback-btn dislike" title="Pas pour moi">👎</button>
+                    </div>
+                </article>
+                {% endfor %}
+            {% else %}
+                <p class="no-data">Aucune suggestion disponible pour le moment.</p>
+            {% endif %}
+        </div>
+
+        <!-- Films -->
+        <h2 class="section-title">Films à l'affiche</h2>
+
+        {% if movies %}
+        <div class="films-grid">
+            {% for movie in movies %}
+            <article class="film-card">
+                <h4>{{ movie.title }}</h4>
+                <p class="director">{{ movie.director or 'Réalisateur inconnu' }}</p>
+                <p class="film-meta">
+                    {% if movie.telerama_pick %}
+                    <span class="telerama">★ Télérama</span> ·
+                    {% endif %}
+                    {% if movie.press_rating %}
+                    Note : {{ "%.1f"|format(movie.press_rating) }}/5
+                    {% else %}
+                    Note : N/A
+                    {% endif %}
+                </p>
+                <p class="cinemas">{{ movie.cinemas_display }}</p>
+                {% if movie.allocine_url %}
+                <a href="{{ movie.allocine_url }}" target="_blank">Voir sur Allocine →</a>
+                {% endif %}
+            </article>
+            {% endfor %}
+        </div>
+        {% else %}
+        <p class="no-data">Aucun film Art & Essai trouvé pour cette période.</p>
+        {% endif %}
+
+        <!-- Randonnées -->
+        {% if show_hiking and hikes %}
+        <h2 class="section-title">Randonnées du week-end</h2>
+
+        <div class="hiking-grid">
+            {% for hike in hikes %}
+            <article class="hike-card">
+                <h4>{{ hike.title }}</h4>
+                <div class="hike-meta">
+                    <span>📏 {{ "%.1f"|format(hike.distance_km) }} km</span>
+                    <span>⏱ {{ "%.1f"|format(hike.duration_h) }}h</span>
+                    <span>⛰ {{ hike.elevation_gain }}m D+</span>
+                    <span>{{ hike.difficulty }}</span>
+                </div>
+                <p class="start">Départ : {{ hike.start_city or 'NC' }} ({{ hike.distance_from_home|int }} km)</p>
+                {% if hike.url %}
+                <a href="{{ hike.url }}" target="_blank">Voir sur Visorando →</a>
+                {% endif %}
+            </article>
+            {% endfor %}
+        </div>
+        {% endif %}
+    </main>
+
+    <footer>
+        <div class="container">
+            Généré le {{ generated_at.strftime('%d/%m/%Y à %H:%M') }} · Prochaine mise à jour mercredi
+        </div>
+    </footer>
+</body>
+</html>
