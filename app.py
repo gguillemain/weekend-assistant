@@ -1,12 +1,45 @@
-from flask import Flask, render_template, Response
+from flask import Flask, render_template, Response, request, jsonify
 import json
+import atexit
 import config
 from engine import calendar_engine
 from engine import suggest
+from engine import email_sender
+from engine import profile
 from collectors import weather, cinema, events, hiking
+from apscheduler.schedulers.background import BackgroundScheduler
 
 app = Flask(__name__)
 app.secret_key = config.FLASK_SECRET_KEY
+
+# Scheduler pour l'envoi d'email hebdomadaire
+scheduler = BackgroundScheduler()
+
+
+def scheduled_email_job():
+    """Job planifié pour l'envoi d'email."""
+    with app.app_context():
+        result = email_sender.send_weekly_email(app)
+        print(f"[Scheduler] Email: {result['message']}")
+
+
+# Planifier l'envoi chaque mercredi à 18h
+scheduler.add_job(
+    func=scheduled_email_job,
+    trigger="cron",
+    day_of_week="wed",
+    hour=18,
+    minute=0,
+    id="weekly_email",
+    replace_existing=True
+)
+
+# Démarrer le scheduler (seulement si pas déjà démarré)
+if not scheduler.running:
+    scheduler.start()
+
+# Arrêter proprement le scheduler à la fermeture
+atexit.register(lambda: scheduler.shutdown())
 
 
 def prepare_movies_for_template(movies: list) -> list:
@@ -52,19 +85,24 @@ def index():
                                movies=[],
                                hikes=[],
                                show_hiking=False,
+                               is_vacation=False,
+                               travel={},
                                generated_at=result.get("generated_at"))
 
     # Suggestions structurées (déjà parsées depuis JSON)
     suggestions = result.get("suggestions", [])
     intro = result.get("intro", "")
+    is_vacation = result.get("is_vacation", False)
 
-    # Préparer les films
-    movies = prepare_movies_for_template(result.get("movies", []))
+    # Préparer les films (seulement en mode week-end)
+    movies = []
+    if not is_vacation:
+        movies = prepare_movies_for_template(result.get("movies", []))
 
     # Vérifier si on affiche les randonnées (au moins un jour favorable)
     weather_data = result.get("weather", {})
     show_hiking = False
-    if weather_data.get("days"):
+    if not is_vacation and weather_data.get("days"):
         show_hiking = any(d.get("suitable_outdoor", False) for d in weather_data["days"])
 
     return render_template("index.html",
@@ -75,6 +113,8 @@ def index():
                            movies=movies,
                            hikes=result.get("hikes", [])[:3],
                            show_hiking=show_hiking,
+                           is_vacation=is_vacation,
+                           travel=result.get("travel", {}),
                            generated_at=result["generated_at"])
 
 
@@ -97,6 +137,148 @@ def suggest_route():
     }
     return Response(json.dumps(output, ensure_ascii=False, indent=2),
                     mimetype="application/json; charset=utf-8")
+
+
+@app.route("/feedback", methods=["POST"])
+def feedback_route():
+    """Endpoint pour enregistrer le feedback utilisateur."""
+    data = request.get_json()
+
+    if not data:
+        return jsonify({"error": "JSON requis"}), 400
+
+    title = data.get("title")
+    suggestion_type = data.get("type", "autre")
+    rating = data.get("rating")
+    period_start = data.get("period_start")
+
+    if not title or rating is None:
+        return jsonify({"error": "title et rating requis"}), 400
+
+    if rating not in (1, -1):
+        return jsonify({"error": "rating doit etre 1 ou -1"}), 400
+
+    period = {"start": period_start} if period_start else {}
+    profile.add_feedback(period, title, suggestion_type, rating)
+
+    return jsonify({"ok": True})
+
+
+@app.route("/profile")
+def profile_route():
+    """Endpoint pour consulter le profil complet."""
+    user_profile = profile.get_profile()
+    stats = profile.get_activity_stats()
+    recent_feedback = profile.get_recent_feedback(10)
+    recent_activities = profile.get_recent_activities(10)
+
+    return jsonify({
+        "profile": user_profile,
+        "stats": stats,
+        "recent_feedback": recent_feedback,
+        "recent_activities": recent_activities
+    })
+
+
+@app.route("/activity", methods=["POST"])
+def activity_route():
+    """Endpoint pour enregistrer une activité."""
+    data = request.get_json()
+
+    if not data:
+        return jsonify({"error": "JSON requis"}), 400
+
+    category = data.get("category")
+    note = data.get("note", "")
+    period_start = data.get("period_start")
+    period_end = data.get("period_end")
+    period_label = data.get("period_label", "")
+
+    if not category:
+        return jsonify({"error": "category requis"}), 400
+
+    period = {
+        "start": period_start,
+        "end": period_end,
+        "label": period_label
+    }
+    profile.log_activity(period, category, note)
+
+    return jsonify({"ok": True})
+
+
+@app.route("/send-email")
+def send_email_route():
+    """Endpoint pour envoyer manuellement l'email (JSON)."""
+    result = email_sender.send_weekly_email(app)
+    return jsonify(result)
+
+
+@app.route("/test-email")
+def test_email_route():
+    """Endpoint pour tester l'envoi d'email avec confirmation HTML."""
+    result = email_sender.send_weekly_email(app)
+
+    if result["success"]:
+        html = f"""
+        <!DOCTYPE html>
+        <html lang="fr">
+        <head>
+            <meta charset="UTF-8">
+            <title>Email envoyé</title>
+            <style>
+                body {{ font-family: system-ui, sans-serif; background: #FAFAF8; padding: 40px; }}
+                .card {{ max-width: 500px; margin: 0 auto; background: white; border-radius: 12px; padding: 32px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); text-align: center; }}
+                .icon {{ font-size: 48px; margin-bottom: 16px; }}
+                h1 {{ color: #7C9A7E; margin: 0 0 16px 0; }}
+                p {{ color: #555; margin: 8px 0; }}
+                .recipients {{ background: #f5f5f5; padding: 12px; border-radius: 6px; margin-top: 16px; font-size: 14px; }}
+                a {{ color: #7C9A7E; }}
+            </style>
+        </head>
+        <body>
+            <div class="card">
+                <div class="icon">✅</div>
+                <h1>Email envoyé !</h1>
+                <p>{result['message']}</p>
+                <div class="recipients">
+                    <strong>Destinataires :</strong><br>
+                    {', '.join(result.get('recipients', []))}
+                </div>
+                <p style="margin-top: 24px;"><a href="/">← Retour à l'accueil</a></p>
+            </div>
+        </body>
+        </html>
+        """
+    else:
+        html = f"""
+        <!DOCTYPE html>
+        <html lang="fr">
+        <head>
+            <meta charset="UTF-8">
+            <title>Erreur d'envoi</title>
+            <style>
+                body {{ font-family: system-ui, sans-serif; background: #FAFAF8; padding: 40px; }}
+                .card {{ max-width: 500px; margin: 0 auto; background: white; border-radius: 12px; padding: 32px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); text-align: center; }}
+                .icon {{ font-size: 48px; margin-bottom: 16px; }}
+                h1 {{ color: #C0392B; margin: 0 0 16px 0; }}
+                p {{ color: #555; margin: 8px 0; }}
+                .error {{ background: #ffeaea; padding: 12px; border-radius: 6px; margin-top: 16px; font-size: 14px; color: #C0392B; }}
+                a {{ color: #7C9A7E; }}
+            </style>
+        </head>
+        <body>
+            <div class="card">
+                <div class="icon">❌</div>
+                <h1>Échec de l'envoi</h1>
+                <div class="error">{result['message']}</div>
+                <p style="margin-top: 24px;"><a href="/">← Retour à l'accueil</a></p>
+            </div>
+        </body>
+        </html>
+        """
+
+    return html
 
 
 def display_weather_forecast(forecast: dict) -> None:
@@ -244,4 +426,4 @@ if __name__ == "__main__":
         hikes = hiking.get_hiking_suggestions(next_period, forecast)
         hiking.display_hiking_suggestions(hikes)
 
-    app.run(debug=True)
+    app.run(debug=True, port=5001)

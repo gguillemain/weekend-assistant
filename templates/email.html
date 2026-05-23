@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Weekend Assistant - {{ period.label }}</title>
+</head>
+<body style="margin: 0; padding: 0; background-color: #FAFAF8; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
+    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background-color: #FAFAF8;">
+        <tr>
+            <td align="center" style="padding: 20px;">
+                <table role="presentation" width="600" cellspacing="0" cellpadding="0" style="max-width: 600px; width: 100%;">
+
+                    <!-- Header -->
+                    <tr>
+                        <td style="background-color: #7C9A7E; padding: 24px; border-radius: 12px 12px 0 0;">
+                            <h1 style="margin: 0 0 8px 0; color: #FFFFFF; font-size: 24px; font-weight: 600;">Weekend Assistant</h1>
+                            <p style="margin: 0; color: #FFFFFF; font-size: 16px; opacity: 0.9;">{{ period.label }} · {{ period.start.strftime('%d') }} au {{ period.end.strftime('%d %B') }}</p>
+                        </td>
+                    </tr>
+
+                    <!-- Weather bar -->
+                    {% if weather and weather.days %}
+                    <tr>
+                        <td style="background-color: #6B8A6D; padding: 12px 24px;">
+                            <table role="presentation" width="100%" cellspacing="0" cellpadding="0">
+                                <tr>
+                                    {% for day in weather.days %}
+                                    <td style="text-align: center; color: #FFFFFF; padding: 8px;">
+                                        <span style="display: inline-block; width: 10px; height: 10px; border-radius: 50%; background-color: {{ '#4CAF50' if day.suitable_outdoor else '#D64545' }}; margin-right: 4px;"></span>
+                                        <strong>{{ day.label[:3] }}</strong><br>
+                                        <span style="font-size: 14px; opacity: 0.9;">{{ day.temp_min|int }}° / {{ day.temp_max|int }}°</span>
+                                    </td>
+                                    {% endfor %}
+                                </tr>
+                            </table>
+                        </td>
+                    </tr>
+                    {% endif %}
+
+                    <!-- Main content -->
+                    <tr>
+                        <td style="background-color: #FFFFFF; padding: 24px;">
+
+                            <!-- Intro -->
+                            {% if intro %}
+                            <p style="margin: 0 0 24px 0; color: #555555; font-size: 16px; font-style: italic; line-height: 1.5;">{{ intro }}</p>
+                            {% endif %}
+
+                            <!-- Suggestions -->
+                            {% if is_vacation %}
+                            <h2 style="margin: 0 0 16px 0; color: #5D8A9F; font-size: 18px; font-weight: 600; border-bottom: 2px solid #E5E5E3; padding-bottom: 8px;">Idées de voyage</h2>
+                            {% else %}
+                            <h2 style="margin: 0 0 16px 0; color: #7C9A7E; font-size: 18px; font-weight: 600; border-bottom: 2px solid #E5E5E3; padding-bottom: 8px;">Suggestions pour ce week-end</h2>
+                            {% endif %}
+
+                            {% for suggestion in suggestions[:3] %}
+                            <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="margin-bottom: 16px; background-color: #FAFAF8; border-radius: 8px;">
+                                <tr>
+                                    <td style="padding: 16px;">
+                                        <h3 style="margin: 0 0 8px 0; color: #2C2C2C; font-size: 16px;">
+                                            <span style="font-size: 20px; margin-right: 8px;">{{ suggestion.emoji }}</span>{{ suggestion.title }}
+                                        </h3>
+                                        <p style="margin: 0 0 12px 0; color: #444444; font-size: 14px; line-height: 1.5;">{{ suggestion.description }}</p>
+                                        <table role="presentation" cellspacing="0" cellpadding="0">
+                                            <tr>
+                                                {% if suggestion.day %}
+                                                <td style="padding-right: 8px;">
+                                                    <span style="display: inline-block; padding: 4px 10px; background-color: #9DB89F; color: #FFFFFF; border-radius: 12px; font-size: 12px;">{{ suggestion.day }}</span>
+                                                </td>
+                                                {% endif %}
+                                                {% if suggestion.destination %}
+                                                <td style="padding-right: 8px;">
+                                                    <span style="display: inline-block; padding: 4px 10px; background-color: #9B59B6; color: #FFFFFF; border-radius: 12px; font-size: 12px;">{{ suggestion.destination }}</span>
+                                                </td>
+                                                {% endif %}
+                                                {% if suggestion.logistics %}
+                                                {% if is_vacation %}
+                                                {% set bg_color = '#3498DB' %}
+                                                {% else %}
+                                                {% set bg_color = '#7C9A7E' if 'Spontané' in suggestion.logistics else ('#E8A838' if 'réserver' in suggestion.logistics else '#C0392B') %}
+                                                {% endif %}
+                                                <td>
+                                                    <span style="display: inline-block; padding: 4px 10px; background-color: {{ bg_color }}; color: #FFFFFF; border-radius: 12px; font-size: 12px;">{{ suggestion.logistics }}</span>
+                                                </td>
+                                                {% endif %}
+                                            </tr>
+                                        </table>
+                                    </td>
+                                </tr>
+                            </table>
+                            {% endfor %}
+
+                            <!-- Films -->
+                            {% if movies %}
+                            <h2 style="margin: 24px 0 16px 0; color: #7C9A7E; font-size: 18px; font-weight: 600; border-bottom: 2px solid #E5E5E3; padding-bottom: 8px;">Films à l'affiche</h2>
+
+                            <table role="presentation" width="100%" cellspacing="0" cellpadding="0">
+                                {% for movie in movies[:3] %}
+                                <tr>
+                                    <td style="padding: 12px 0; border-bottom: 1px solid #E5E5E3;">
+                                        <strong style="color: #2C2C2C; font-size: 14px;">{{ movie.title }}</strong>
+                                        {% if movie.telerama_pick %}<span style="color: #E8A838; font-weight: 600;"> ★ Télérama</span>{% endif %}
+                                        <br>
+                                        <span style="color: #888888; font-size: 13px;">{{ movie.director or 'Réalisateur inconnu' }}</span>
+                                        {% if movie.press_rating %}<span style="color: #555555; font-size: 13px;"> · {{ "%.1f"|format(movie.press_rating) }}/5</span>{% endif %}
+                                        <br>
+                                        <span style="color: #888888; font-size: 12px;">{{ movie.cinemas_display }}</span>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </table>
+                            {% endif %}
+
+                            <!-- Randonnées -->
+                            {% if show_hiking and hikes %}
+                            <h2 style="margin: 24px 0 16px 0; color: #7C9A7E; font-size: 18px; font-weight: 600; border-bottom: 2px solid #E5E5E3; padding-bottom: 8px;">Randonnées du week-end</h2>
+
+                            <table role="presentation" width="100%" cellspacing="0" cellpadding="0">
+                                {% for hike in hikes[:3] %}
+                                <tr>
+                                    <td style="padding: 12px 0; border-bottom: 1px solid #E5E5E3;">
+                                        <strong style="color: #2C2C2C; font-size: 14px;">{{ hike.title }}</strong><br>
+                                        <span style="color: #555555; font-size: 13px;">{{ "%.1f"|format(hike.distance_km) }} km · {{ "%.1f"|format(hike.duration_h) }}h · {{ hike.elevation_gain }}m D+</span><br>
+                                        <span style="color: #888888; font-size: 12px;">Départ : {{ hike.start_city or 'NC' }} ({{ hike.distance_from_home|int }} km)</span>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </table>
+                            {% endif %}
+
+                        </td>
+                    </tr>
+
+                    <!-- Footer -->
+                    <tr>
+                        <td style="background-color: #FAFAF8; padding: 24px; text-align: center; border-radius: 0 0 12px 12px;">
+                            <p style="margin: 0 0 12px 0; color: #888888; font-size: 14px;">
+                                Généré le {{ generated_at.strftime('%d/%m/%Y à %H:%M') }}
+                            </p>
+                            {% if app_url %}
+                            <a href="{{ app_url }}" style="display: inline-block; padding: 10px 20px; background-color: #7C9A7E; color: #FFFFFF; text-decoration: none; border-radius: 6px; font-size: 14px;">Voir toutes les suggestions</a>
+                            {% endif %}
+                        </td>
+                    </tr>
+
+                </table>
+            </td>
+        </tr>
+    </table>
+</body>
+</html>

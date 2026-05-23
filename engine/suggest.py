@@ -3,11 +3,11 @@ import json
 from datetime import datetime
 from typing import Dict, List
 
-from engine import calendar_engine
-from collectors import weather, cinema, events, hiking
+from engine import calendar_engine, profile
+from collectors import weather, cinema, events, hiking, travel
 
 
-SYSTEM_PROMPT = """Tu es un assistant personnel de loisirs pour un couple
+BASE_SYSTEM_PROMPT = """Tu es un assistant personnel de loisirs pour un couple
 d'enseignants alsaciens (région Guebwiller, Haut-Rhin).
 Ils ont passé la cinquantaine et cherchent à profiter
 davantage de leur temps libre. Ils aiment le cinéma
@@ -24,8 +24,74 @@ les données Visorando fournies. Ne jamais inventer
 de randonnée. Si aucune donnée n'est disponible,
 ne propose pas de randonnée.
 
+{profile_section}
+
 IMPORTANT : Tu dois répondre UNIQUEMENT en JSON valide,
 sans markdown, sans texte avant ou après. Pas de ```json, juste le JSON brut."""
+
+
+VACATION_BASE_PROMPT = """Tu es un assistant personnel de voyages pour un couple
+d'enseignants alsaciens (région Guebwiller, Haut-Rhin).
+Ils ont passé la cinquantaine et profitent de leurs vacances
+pour voyager. Ils aiment la culture, l'art, la gastronomie,
+les belles villes européennes. Ils préfèrent les city breaks
+authentiques aux destinations touristiques de masse.
+
+Tu proposes des idées de voyages concrètes et réalisables,
+basées UNIQUEMENT sur les destinations fournies.
+Tu n'inventes pas de destinations. Ton ton est enthousiaste
+mais réaliste, avec des conseils pratiques.
+
+{profile_section}
+
+IMPORTANT : Tu dois répondre UNIQUEMENT en JSON valide,
+sans markdown, sans texte avant ou après. Pas de ```json, juste le JSON brut."""
+
+
+def _build_profile_section() -> str:
+    """Construit la section profil pour le prompt système."""
+    user_profile = profile.get_profile()
+    stats = profile.get_activity_stats()
+
+    lines = ["Profil utilisateur :"]
+
+    # Musique
+    artists = user_profile.get("music_artists", [])
+    genres = user_profile.get("music_genres", [])
+    if artists or genres:
+        lines.append(f"Musique appréciée : {', '.join(artists)}")
+        lines.append(f"Genres : {', '.join(genres)}")
+
+    # Expos
+    expo_artists = user_profile.get("expo_artists", [])
+    expo_style = user_profile.get("expo_style", "")
+    fondations = user_profile.get("expo_fondations", [])
+    if expo_artists:
+        lines.append(f"Expos : artistes {', '.join(expo_artists)}, style {expo_style}")
+    if fondations:
+        lines.append(f"Fondations favorites : {', '.join(fondations)}")
+
+    # Comportement récent
+    lines.append("")
+    lines.append("Comportement récent :")
+
+    last_outing = stats.get("last_outing_days_ago", -1)
+    if last_outing >= 0:
+        lines.append(f"- Dernière vraie sortie : il y a {last_outing} jours")
+    else:
+        lines.append("- Aucune sortie enregistrée récemment")
+
+    streak = stats.get("streak_home", 0)
+    lines.append(f"- Semaines consécutives à la maison : {streak}")
+
+    # Message de motivation si streak >= 3
+    if streak >= 3:
+        lines.append("")
+        lines.append("IMPORTANT : Cela fait plusieurs semaines qu'ils restent à la maison.")
+        lines.append("Commence tes suggestions par une phrase de motivation douce mais directe,")
+        lines.append("sans culpabiliser, pour les encourager à sortir.")
+
+    return "\n".join(lines)
 
 
 def _format_weather_context(weather_data: Dict) -> str:
@@ -127,6 +193,46 @@ def _format_hiking_context(hikes: List[Dict]) -> str:
     return "\n".join(lines)
 
 
+def _build_vacation_prompt(period: Dict, travel_data: Dict) -> str:
+    """Construit le prompt utilisateur pour les vacances."""
+    period_info = f"""Période : {period['label']}
+Dates : du {period['start'].strftime('%d/%m/%Y')} au {period['end'].strftime('%d/%m/%Y')}
+Durée : {period['days']} jours"""
+
+    travel_context = travel.format_travel_context(travel_data)
+
+    request = """Propose 3 à 4 idées de voyage pour ces vacances.
+
+Réponds UNIQUEMENT en JSON valide avec ce format exact :
+{
+  "intro": "phrase d'accroche enthousiaste pour ces vacances",
+  "suggestions": [
+    {
+      "emoji": "🇮🇹",
+      "title": "Escapade à [Ville]",
+      "description": "Description de 3-4 phrases expliquant pourquoi cette destination est idéale, ce qu'il y a à voir/faire, et des conseils pratiques.",
+      "day": "3-4 jours",
+      "logistics": "Train direct",
+      "type": "voyage",
+      "destination": "Ville, Pays"
+    }
+  ]
+}
+
+Valeurs possibles :
+- day : durée suggérée ("2-3 jours", "4-5 jours", "1 semaine")
+- logistics : mode de transport ("Train", "Avion", "Voiture", "Train direct")
+- type : toujours "voyage"
+
+Mélange city breaks proches et destinations plus lointaines si la durée le permet."""
+
+    return f"""{period_info}
+
+{travel_context}
+
+{request}"""
+
+
 def _build_user_prompt(period: Dict, weather_data: Dict, movies: List[Dict], events_list: List[Dict], hikes: List[Dict]) -> str:
     """Construit le prompt utilisateur complet."""
     period_info = f"""Période : {period['label']}
@@ -181,22 +287,39 @@ def generate_suggestions(period: Dict) -> Dict:
     Orchestre tous les collectors et appelle Claude API
     pour produire des suggestions structurées.
     """
-    # 1. Collecter les données
-    weather_data = weather.get_weather_forecast(period)
-    movies = cinema.get_artetal_movies(period)
-    events_list = events.get_local_events(period)
-    hikes = hiking.get_hiking_suggestions(period, weather_data)
+    is_vacation = period.get("mode") == "vacances"
 
-    # 2. Construire le contexte pour Claude
-    user_prompt = _build_user_prompt(period, weather_data, movies, events_list, hikes)
+    # Construire la section profil pour le prompt
+    profile_section = _build_profile_section()
 
-    # 3. Appeler Claude API
+    if is_vacation:
+        # Mode vacances : suggestions voyage
+        travel_data = travel.get_travel_suggestions(period)
+        user_prompt = _build_vacation_prompt(period, travel_data)
+        system_prompt = VACATION_BASE_PROMPT.format(profile_section=profile_section)
+
+        # Données minimales pour le template
+        weather_data = {}
+        movies = []
+        events_list = []
+        hikes = []
+    else:
+        # Mode week-end : suggestions locales
+        weather_data = weather.get_weather_forecast(period)
+        movies = cinema.get_artetal_movies(period)
+        events_list = events.get_local_events(period)
+        hikes = hiking.get_hiking_suggestions(period, weather_data)
+        user_prompt = _build_user_prompt(period, weather_data, movies, events_list, hikes)
+        system_prompt = BASE_SYSTEM_PROMPT.format(profile_section=profile_section)
+        travel_data = {}
+
+    # Appeler Claude API
     client = anthropic.Anthropic()
 
     message = client.messages.create(
         model="claude-sonnet-4-20250514",
         max_tokens=2000,
-        system=SYSTEM_PROMPT,
+        system=system_prompt,
         messages=[
             {"role": "user", "content": user_prompt}
         ]
@@ -233,9 +356,11 @@ def generate_suggestions(period: Dict) -> Dict:
     return {
         "period": period,
         "weather": weather_data,
-        "movies": movies[:5],
-        "events": events_list[:8],
-        "hikes": hikes[:3],
+        "movies": movies[:5] if movies else [],
+        "events": events_list[:8] if events_list else [],
+        "hikes": hikes[:3] if hikes else [],
+        "travel": travel_data if is_vacation else {},
+        "is_vacation": is_vacation,
         "suggestions": suggestions,
         "intro": intro,
         "suggestions_text": suggestions_text,

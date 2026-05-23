@@ -17,7 +17,10 @@ weekend_assistant/
 ├── engine/
 │   ├── __init__.py
 │   ├── calendar_engine.py    # Détection périodes : weekends, ponts, vacances
-│   └── suggest.py            # Orchestration collectors + appel Claude API
+│   ├── suggest.py            # Orchestration collectors + appel Claude API
+│   ├── email_sender.py       # Envoi email hebdomadaire SMTP
+│   ├── database.py           # Init SQLite preferences.db
+│   └── profile.py            # Gestion profil, feedback, activités
 │
 ├── collectors/
 │   ├── __init__.py
@@ -25,13 +28,18 @@ weekend_assistant/
 │   ├── cinema.py             # Scraping Allocine + RSS Télérama/Cahiers
 │   ├── events.py             # Scraping JDS, Strasbourg, Visit Alsace
 │   ├── hiking.py             # Scraping Visorando
+│   ├── travel.py             # Destinations city break / Eurotrip
 │   └── rss_reader.py         # Utilitaire parsing RSS/Atom
 │
 ├── templates/
-│   └── index.html            # Interface web responsive
+│   ├── index.html            # Interface web responsive
+│   └── email.html            # Template email hebdomadaire
 │
 └── data/
-    └── .gitkeep              # Réservé pour SQLite (futur)
+    ├── __init__.py
+    ├── database.py           # Module SQLite (legacy)
+    ├── activity.db           # Base SQLite feedback (legacy)
+    └── preferences.db        # Base SQLite profil/activités/feedback
 ```
 
 ## 2. État des composants
@@ -91,18 +99,18 @@ weekend_assistant/
 ### Phase 1 - Consolidation
 - [x] Parsing JSON suggestions
 - [x] Cartes HTML avec badges colorés
-- [ ] Feedback 👍/👎 fonctionnel (POST /feedback)
-- [ ] SQLite activity log (`data/activity.db`)
+- [x] Feedback 👍/👎 fonctionnel (POST /feedback)
+- [x] SQLite activity log (`data/activity.db`)
 
 ### Phase 2 - Automatisation
-- [ ] Scheduler email mercredi (APScheduler ou cron)
-- [ ] Template email HTML
-- [ ] Configuration SMTP dans .env
+- [x] Scheduler email mercredi (APScheduler)
+- [x] Template email HTML
+- [x] Configuration SMTP dans .env
 
 ### Phase 3 - Mode vacances
-- [ ] Détection `period.mode == "vacation"`
-- [ ] Suggestions voyage (Eurotrip, city break)
-- [ ] Intégration booking/train (optionnel)
+- [x] Détection `period.mode == "vacances"`
+- [x] Suggestions voyage (Eurotrip, city break)
+- [ ] Intégration booking/train (optionnel, futur)
 
 ### Phase 4 - Améliorations
 - [ ] Visorando : notes, photos, GPX
@@ -123,6 +131,14 @@ Créer `.env` à la racine :
 ANTHROPIC_API_KEY=sk-ant-...
 OPENWEATHER_API_KEY=...
 FLASK_SECRET_KEY=...
+
+# Configuration SMTP (Phase 2)
+SMTP_HOST=smtp.gmail.com
+SMTP_PORT=587
+SMTP_USER=votre.email@gmail.com
+SMTP_PASSWORD=xxxx xxxx xxxx xxxx  # App password Gmail
+EMAIL_FROM=votre.email@gmail.com
+EMAIL_TO=destinataire1@email.com,destinataire2@email.com
 ```
 
 ## 6. Commandes utiles
@@ -139,10 +155,13 @@ pip install -r requirements.txt
 python app.py
 
 # Accéder à l'interface
-open http://127.0.0.1:5000
+open http://127.0.0.1:5001
 
 # Endpoint debug JSON
-curl http://127.0.0.1:5000/suggest | jq
+curl http://127.0.0.1:5001/suggest | jq
+
+# Tester l'envoi d'email
+open http://127.0.0.1:5001/test-email
 
 # Tester un collector isolément
 python -c "from collectors import weather; print(weather.get_weather_forecast({'start': __import__('datetime').date.today(), 'end': __import__('datetime').date.today(), 'label': 'Test'}))"

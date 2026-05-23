@@ -168,6 +168,91 @@
             color: var(--white);
         }
 
+        .badge-transport {
+            background: #3498DB;
+            color: var(--white);
+        }
+
+        .badge-destination {
+            background: #9B59B6;
+            color: var(--white);
+        }
+
+        .vacation-mode header {
+            background: linear-gradient(135deg, #7C9A7E 0%, #5D8A9F 100%);
+        }
+
+        /* Widget journal d'activité */
+        .activity-widget {
+            background: var(--white);
+            border-radius: 12px;
+            padding: 1.5rem;
+            margin-top: 2rem;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+        }
+
+        .activity-widget h3 {
+            font-size: 1.1rem;
+            color: var(--anthracite);
+            margin-bottom: 1rem;
+        }
+
+        .activity-buttons {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 0.75rem;
+        }
+
+        .activity-btn {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 1rem 0.5rem;
+            border: 2px solid var(--gray-light);
+            border-radius: 10px;
+            background: var(--white);
+            cursor: pointer;
+            transition: all 0.2s;
+            font-size: 0.85rem;
+            color: var(--anthracite);
+        }
+
+        .activity-btn:hover {
+            border-color: var(--sage);
+            background: #f8faf8;
+        }
+
+        .activity-btn.selected {
+            border-color: var(--sage);
+            background: var(--sage);
+            color: var(--white);
+        }
+
+        .activity-btn .icon {
+            font-size: 1.5rem;
+            margin-bottom: 0.25rem;
+        }
+
+        .activity-confirmation {
+            text-align: center;
+            padding: 0.75rem;
+            margin-top: 1rem;
+            background: #D4EDDA;
+            border-radius: 8px;
+            color: #155724;
+            display: none;
+        }
+
+        .activity-confirmation.visible {
+            display: block;
+        }
+
+        @media (max-width: 600px) {
+            .activity-buttons {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+
         .suggestion-emoji {
             font-size: 1.5rem;
             margin-right: 0.5rem;
@@ -206,6 +291,26 @@
 
         .feedback-btn.dislike {
             background: #E5E5E3;
+        }
+
+        .feedback-btn.selected {
+            transform: scale(1.15);
+            box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+        }
+
+        .feedback-btn.like.selected {
+            background: var(--green);
+            color: white;
+        }
+
+        .feedback-btn.dislike.selected {
+            background: var(--red);
+            color: white;
+        }
+
+        .feedback-btn:disabled {
+            opacity: 0.6;
+            cursor: wait;
         }
 
         /* Film cards */
@@ -350,7 +455,7 @@
         }
     </style>
 </head>
-<body>
+<body{% if is_vacation %} class="vacation-mode"{% endif %}>
     <header>
         <div class="container">
             <h1>Weekend Assistant</h1>
@@ -372,7 +477,11 @@
 
     <main class="container">
         <!-- Suggestions Claude -->
+        {% if is_vacation %}
+        <h2 class="section-title">Idées de voyage pour ces vacances</h2>
+        {% else %}
         <h2 class="section-title">Suggestions pour ce week-end</h2>
+        {% endif %}
 
         {% if intro %}
         <p class="intro-text">{{ intro }}</p>
@@ -381,21 +490,28 @@
         <div class="suggestions">
             {% if suggestions %}
                 {% for suggestion in suggestions %}
-                <article class="suggestion-card">
+                <article class="suggestion-card" data-title="{{ suggestion.title }}" data-suggestion-type="{{ suggestion.type or 'autre' }}">
                     <h3><span class="suggestion-emoji">{{ suggestion.emoji }}</span>{{ suggestion.title }}</h3>
                     <p class="description">{{ suggestion.description }}</p>
                     <div class="suggestion-meta">
                         {% if suggestion.day %}
                         <span class="badge badge-day">📅 {{ suggestion.day }}</span>
                         {% endif %}
+                        {% if suggestion.destination %}
+                        <span class="badge badge-destination">📍 {{ suggestion.destination }}</span>
+                        {% endif %}
                         {% if suggestion.logistics %}
+                        {% if is_vacation %}
+                        <span class="badge badge-transport">🚆 {{ suggestion.logistics }}</span>
+                        {% else %}
                         {% set logistics_class = 'spontane' if 'Spontané' in suggestion.logistics else ('reserver' if 'réserver' in suggestion.logistics else 'planifier') %}
                         <span class="badge badge-logistics-{{ logistics_class }}">⚡ {{ suggestion.logistics }}</span>
                         {% endif %}
+                        {% endif %}
                     </div>
                     <div class="feedback-buttons">
-                        <button class="feedback-btn like" title="J'aime">👍</button>
-                        <button class="feedback-btn dislike" title="Pas pour moi">👎</button>
+                        <button class="feedback-btn like" data-rating="1" title="J'aime">👍</button>
+                        <button class="feedback-btn dislike" data-rating="-1" title="Pas pour moi">👎</button>
                     </div>
                 </article>
                 {% endfor %}
@@ -404,7 +520,8 @@
             {% endif %}
         </div>
 
-        <!-- Films -->
+        <!-- Films (masqué en mode vacances) -->
+        {% if not is_vacation %}
         <h2 class="section-title">Films à l'affiche</h2>
 
         {% if movies %}
@@ -433,6 +550,7 @@
         {% else %}
         <p class="no-data">Aucun film Art & Essai trouvé pour cette période.</p>
         {% endif %}
+        {% endif %}
 
         <!-- Randonnées -->
         {% if show_hiking and hikes %}
@@ -456,6 +574,32 @@
             {% endfor %}
         </div>
         {% endif %}
+
+        <!-- Widget journal d'activité -->
+        <section class="activity-widget">
+            <h3>Ce week-end, vous avez :</h3>
+            <div class="activity-buttons">
+                <button class="activity-btn" data-category="maison">
+                    <span class="icon">🏠</span>
+                    <span>Maison</span>
+                </button>
+                <button class="activity-btn" data-category="travaux">
+                    <span class="icon">🔨</span>
+                    <span>Travaux</span>
+                </button>
+                <button class="activity-btn" data-category="sortie_locale">
+                    <span class="icon">🎭</span>
+                    <span>Sortie</span>
+                </button>
+                <button class="activity-btn" data-category="voyage">
+                    <span class="icon">✈️</span>
+                    <span>Voyage</span>
+                </button>
+            </div>
+            <div class="activity-confirmation" id="activity-confirmation">
+                Enregistré ✓
+            </div>
+        </section>
     </main>
 
     <footer>
@@ -463,5 +607,94 @@
             Généré le {{ generated_at.strftime('%d/%m/%Y à %H:%M') }} · Prochaine mise à jour mercredi
         </div>
     </footer>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            var periodStart = "{{ period.start.strftime('%Y-%m-%d') if period else '' }}";
+            var periodEnd = "{{ period.end.strftime('%Y-%m-%d') if period else '' }}";
+            var periodLabel = "{{ period.label if period else '' }}";
+
+            // Boutons feedback 👍/👎
+            document.querySelectorAll('.feedback-btn').forEach(function(btn) {
+                btn.addEventListener('click', function() {
+                    var card = this.closest('.suggestion-card');
+                    var title = card.dataset.title;
+                    var suggestionType = card.dataset.suggestionType;
+                    var rating = parseInt(this.dataset.rating);
+                    var buttons = card.querySelectorAll('.feedback-btn');
+
+                    buttons.forEach(function(b) { b.disabled = true; });
+
+                    fetch('/feedback', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            title: title,
+                            type: suggestionType,
+                            rating: rating,
+                            period_start: periodStart
+                        })
+                    })
+                    .then(function(response) { return response.json(); })
+                    .then(function(data) {
+                        if (data.ok) {
+                            buttons.forEach(function(b) {
+                                b.classList.remove('selected');
+                                if (b !== btn) {
+                                    b.style.opacity = '0.4';
+                                }
+                            });
+                            btn.classList.add('selected');
+                        }
+                    })
+                    .catch(function(err) {
+                        console.error('Erreur feedback:', err);
+                    })
+                    .finally(function() {
+                        buttons.forEach(function(b) { b.disabled = false; });
+                    });
+                });
+            });
+
+            // Boutons journal d'activité
+            document.querySelectorAll('.activity-btn').forEach(function(btn) {
+                btn.addEventListener('click', function() {
+                    var category = this.dataset.category;
+                    var buttons = document.querySelectorAll('.activity-btn');
+                    var confirmation = document.getElementById('activity-confirmation');
+
+                    buttons.forEach(function(b) { b.disabled = true; });
+
+                    fetch('/activity', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            category: category,
+                            period_start: periodStart,
+                            period_end: periodEnd,
+                            period_label: periodLabel
+                        })
+                    })
+                    .then(function(response) { return response.json(); })
+                    .then(function(data) {
+                        if (data.ok) {
+                            buttons.forEach(function(b) { b.classList.remove('selected'); });
+                            btn.classList.add('selected');
+                            confirmation.classList.add('visible');
+                            setTimeout(function() {
+                                confirmation.classList.remove('visible');
+                            }, 3000);
+                        }
+                    })
+                    .catch(function(err) {
+                        console.error('Erreur activity:', err);
+                    })
+                    .finally(function() {
+                        buttons.forEach(function(b) { b.disabled = false; });
+                    });
+                });
+            });
+        });
+    </script>
 </body>
 </html>
