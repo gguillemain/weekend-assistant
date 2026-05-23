@@ -29,6 +29,7 @@ weekend_assistant/
 │   ├── events.py             # Scraping JDS, Strasbourg, Visit Alsace
 │   ├── hiking.py             # Scraping Visorando
 │   ├── travel.py             # Destinations city break / Eurotrip
+│   ├── concerts.py           # Ticketmaster API + RSS salles locales
 │   └── rss_reader.py         # Utilitaire parsing RSS/Atom
 │
 ├── templates/
@@ -134,6 +135,7 @@ Créer `.env` à la racine :
 ANTHROPIC_API_KEY=sk-ant-...
 OPENWEATHER_API_KEY=...
 FLASK_SECRET_KEY=...
+TICKETMASTER_API_KEY=...  # developer.ticketmaster.com
 
 # Configuration SMTP (Phase 2)
 SMTP_HOST=smtp.gmail.com
