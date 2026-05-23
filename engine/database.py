@@ -41,9 +41,16 @@ def init_db():
             period_label TEXT,
             category TEXT,
             note TEXT,
+            films_seen TEXT,
+            concerts_seen TEXT,
+            expos_seen TEXT,
+            stayed_home_reason TEXT,
             created_at DATETIME DEFAULT CURRENT_TIMESTAMP
         )
     """)
+
+    # Migration : ajouter les nouveaux champs si la table existe déjà
+    _migrate_activity_log(cursor)
 
     # Table suggestion_feedback : feedback sur les suggestions
     cursor.execute("""
@@ -63,6 +70,24 @@ def init_db():
     _populate_initial_profile(cursor)
     conn.commit()
     conn.close()
+
+
+def _migrate_activity_log(cursor):
+    """Ajoute les nouveaux champs à activity_log si ils n'existent pas."""
+    # Vérifier les colonnes existantes
+    cursor.execute("PRAGMA table_info(activity_log)")
+    columns = {row[1] for row in cursor.fetchall()}
+
+    new_columns = [
+        ("films_seen", "TEXT"),
+        ("concerts_seen", "TEXT"),
+        ("expos_seen", "TEXT"),
+        ("stayed_home_reason", "TEXT"),
+    ]
+
+    for col_name, col_type in new_columns:
+        if col_name not in columns:
+            cursor.execute(f"ALTER TABLE activity_log ADD COLUMN {col_name} {col_type}")
 
 
 def _populate_initial_profile(cursor):

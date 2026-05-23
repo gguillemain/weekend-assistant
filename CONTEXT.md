@@ -113,6 +113,9 @@ weekend_assistant/
 - [ ] Intégration booking/train (optionnel, futur)
 
 ### Phase 4 - Améliorations
+- [x] Journal d'activité enrichi (films, concerts, expos vus)
+- [x] Widget formulaire progressif
+- [x] Historique injecté dans prompt Claude
 - [ ] Visorando : notes, photos, GPX
 - [ ] Cache Redis/fichier pour réduire scraping
 - [ ] Tests unitaires collectors

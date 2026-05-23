@@ -182,7 +182,7 @@
             background: linear-gradient(135deg, #7C9A7E 0%, #5D8A9F 100%);
         }
 
-        /* Widget journal d'activité */
+        /* Widget journal d'activité - Formulaire progressif */
         .activity-widget {
             background: var(--white);
             border-radius: 12px;
@@ -195,6 +195,14 @@
             font-size: 1.1rem;
             color: var(--anthracite);
             margin-bottom: 1rem;
+        }
+
+        .activity-step {
+            display: none;
+        }
+
+        .activity-step.active {
+            display: block;
         }
 
         .activity-buttons {
@@ -233,9 +241,91 @@
             margin-bottom: 0.25rem;
         }
 
+        /* Étape 2 - Détails */
+        .reason-buttons {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 0.75rem;
+            margin-top: 1rem;
+        }
+
+        .detail-options {
+            margin-top: 1rem;
+        }
+
+        .detail-option {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            padding: 0.75rem;
+            margin-bottom: 0.5rem;
+            background: #f8f8f8;
+            border-radius: 8px;
+        }
+
+        .detail-option input[type="checkbox"] {
+            width: 18px;
+            height: 18px;
+            accent-color: var(--sage);
+        }
+
+        .detail-option label {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            cursor: pointer;
+            flex: 1;
+        }
+
+        .detail-option input[type="text"] {
+            flex: 1;
+            padding: 0.5rem;
+            border: 1px solid var(--gray-light);
+            border-radius: 6px;
+            font-size: 0.9rem;
+            display: none;
+        }
+
+        .detail-option input[type="text"].visible {
+            display: block;
+        }
+
+        /* Étape 3 - Actions */
+        .activity-actions {
+            display: flex;
+            gap: 1rem;
+            margin-top: 1.5rem;
+        }
+
+        .btn-submit {
+            flex: 1;
+            padding: 0.75rem 1.5rem;
+            background: var(--sage);
+            color: var(--white);
+            border: none;
+            border-radius: 8px;
+            font-size: 1rem;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        .btn-submit:hover {
+            background: #6B8A6D;
+        }
+
+        .btn-back {
+            padding: 0.75rem 1rem;
+            background: var(--gray-light);
+            color: var(--anthracite);
+            border: none;
+            border-radius: 8px;
+            font-size: 0.9rem;
+            cursor: pointer;
+        }
+
         .activity-confirmation {
             text-align: center;
-            padding: 0.75rem;
+            padding: 1rem;
             margin-top: 1rem;
             background: #D4EDDA;
             border-radius: 8px;
@@ -248,7 +338,7 @@
         }
 
         @media (max-width: 600px) {
-            .activity-buttons {
+            .activity-buttons, .reason-buttons {
                 grid-template-columns: repeat(2, 1fr);
             }
         }
@@ -575,29 +665,100 @@
         </div>
         {% endif %}
 
-        <!-- Widget journal d'activité -->
-        <section class="activity-widget">
-            <h3>Ce week-end, vous avez :</h3>
-            <div class="activity-buttons">
-                <button class="activity-btn" data-category="maison">
-                    <span class="icon">🏠</span>
-                    <span>Maison</span>
-                </button>
-                <button class="activity-btn" data-category="travaux">
-                    <span class="icon">🔨</span>
-                    <span>Travaux</span>
-                </button>
-                <button class="activity-btn" data-category="sortie_locale">
-                    <span class="icon">🎭</span>
-                    <span>Sortie</span>
-                </button>
-                <button class="activity-btn" data-category="voyage">
-                    <span class="icon">✈️</span>
-                    <span>Voyage</span>
-                </button>
+        <!-- Widget journal d'activité - Formulaire progressif -->
+        <section class="activity-widget" id="activity-widget">
+            <!-- Étape 1 : Question principale -->
+            <div class="activity-step active" id="step1">
+                <h3>Ce week-end, vous avez :</h3>
+                <div class="activity-buttons">
+                    <button class="activity-btn" data-category="maison">
+                        <span class="icon">🏠</span>
+                        <span>Maison</span>
+                    </button>
+                    <button class="activity-btn" data-category="travaux">
+                        <span class="icon">🔨</span>
+                        <span>Travaux</span>
+                    </button>
+                    <button class="activity-btn" data-category="sortie_locale">
+                        <span class="icon">🎭</span>
+                        <span>Sortie(s)</span>
+                    </button>
+                    <button class="activity-btn" data-category="voyage">
+                        <span class="icon">✈️</span>
+                        <span>Voyage</span>
+                    </button>
+                </div>
             </div>
+
+            <!-- Étape 2a : Raison maison -->
+            <div class="activity-step" id="step2-home">
+                <h3>Pourquoi êtes-vous restés à la maison ?</h3>
+                <div class="reason-buttons">
+                    <button class="activity-btn" data-reason="repos">
+                        <span class="icon">😴</span>
+                        <span>Repos</span>
+                    </button>
+                    <button class="activity-btn" data-reason="travaux">
+                        <span class="icon">🔨</span>
+                        <span>Travaux</span>
+                    </button>
+                    <button class="activity-btn" data-reason="meteo">
+                        <span class="icon">🌧️</span>
+                        <span>Météo</span>
+                    </button>
+                    <button class="activity-btn" data-reason="autre">
+                        <span class="icon">❓</span>
+                        <span>Autre</span>
+                    </button>
+                </div>
+                <div class="activity-actions">
+                    <button class="btn-back" id="back-home">← Retour</button>
+                </div>
+            </div>
+
+            <!-- Étape 2b : Détails sortie/voyage -->
+            <div class="activity-step" id="step2-outing">
+                <h3>Qu'avez-vous fait ?</h3>
+                <div class="detail-options">
+                    <div class="detail-option">
+                        <input type="checkbox" id="opt-film">
+                        <label for="opt-film"><span>🎬</span> Vu un film</label>
+                        <input type="text" id="film-title" placeholder="Lequel ?">
+                    </div>
+                    <div class="detail-option">
+                        <input type="checkbox" id="opt-concert">
+                        <label for="opt-concert"><span>🎵</span> Concert</label>
+                        <input type="text" id="concert-detail" placeholder="Qui ? Où ?">
+                    </div>
+                    <div class="detail-option">
+                        <input type="checkbox" id="opt-expo">
+                        <label for="opt-expo"><span>🖼️</span> Expo</label>
+                        <input type="text" id="expo-detail" placeholder="Laquelle ? Où ?">
+                    </div>
+                    <div class="detail-option">
+                        <input type="checkbox" id="opt-rando">
+                        <label for="opt-rando"><span>🥾</span> Rando</label>
+                        <input type="text" id="rando-detail" placeholder="Laquelle ?">
+                    </div>
+                    <div class="detail-option">
+                        <input type="checkbox" id="opt-resto">
+                        <label for="opt-resto"><span>🍽️</span> Restaurant</label>
+                    </div>
+                    <div class="detail-option">
+                        <input type="checkbox" id="opt-balade">
+                        <label for="opt-balade"><span>🛍️</span> Balade ville</label>
+                        <input type="text" id="balade-detail" placeholder="Où ?">
+                    </div>
+                </div>
+                <div class="activity-actions">
+                    <button class="btn-back" id="back-outing">← Retour</button>
+                    <button class="btn-submit" id="submit-outing">Enregistrer</button>
+                </div>
+            </div>
+
+            <!-- Confirmation -->
             <div class="activity-confirmation" id="activity-confirmation">
-                Enregistré ✓
+                ✓ Week-end enregistré
             </div>
         </section>
     </main>
@@ -656,44 +817,160 @@
                 });
             });
 
-            // Boutons journal d'activité
-            document.querySelectorAll('.activity-btn').forEach(function(btn) {
+            // === Widget journal d'activité - Formulaire progressif ===
+            var activityState = {
+                category: null,
+                reason: null
+            };
+
+            function showStep(stepId) {
+                document.querySelectorAll('.activity-step').forEach(function(s) {
+                    s.classList.remove('active');
+                });
+                document.getElementById(stepId).classList.add('active');
+            }
+
+            function showConfirmation() {
+                var confirmation = document.getElementById('activity-confirmation');
+                confirmation.classList.add('visible');
+                setTimeout(function() {
+                    confirmation.classList.remove('visible');
+                    showStep('step1');
+                    resetForm();
+                }, 3000);
+            }
+
+            function resetForm() {
+                activityState = { category: null, reason: null };
+                document.querySelectorAll('.activity-btn').forEach(function(b) {
+                    b.classList.remove('selected');
+                });
+                document.querySelectorAll('.detail-option input[type="checkbox"]').forEach(function(cb) {
+                    cb.checked = false;
+                });
+                document.querySelectorAll('.detail-option input[type="text"]').forEach(function(inp) {
+                    inp.value = '';
+                    inp.classList.remove('visible');
+                });
+            }
+
+            // Étape 1 : Choix catégorie
+            document.querySelectorAll('#step1 .activity-btn').forEach(function(btn) {
                 btn.addEventListener('click', function() {
-                    var category = this.dataset.category;
-                    var buttons = document.querySelectorAll('.activity-btn');
-                    var confirmation = document.getElementById('activity-confirmation');
+                    activityState.category = this.dataset.category;
+                    document.querySelectorAll('#step1 .activity-btn').forEach(function(b) {
+                        b.classList.remove('selected');
+                    });
+                    this.classList.add('selected');
 
-                    buttons.forEach(function(b) { b.disabled = true; });
+                    if (activityState.category === 'maison') {
+                        showStep('step2-home');
+                    } else if (activityState.category === 'travaux') {
+                        // Enregistrer directement les travaux
+                        submitActivity({ category: 'travaux', stayed_home_reason: 'travaux' });
+                    } else {
+                        showStep('step2-outing');
+                    }
+                });
+            });
 
-                    fetch('/activity', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
-                            category: category,
-                            period_start: periodStart,
-                            period_end: periodEnd,
-                            period_label: periodLabel
-                        })
-                    })
-                    .then(function(response) { return response.json(); })
-                    .then(function(data) {
-                        if (data.ok) {
-                            buttons.forEach(function(b) { b.classList.remove('selected'); });
-                            btn.classList.add('selected');
-                            confirmation.classList.add('visible');
-                            setTimeout(function() {
-                                confirmation.classList.remove('visible');
-                            }, 3000);
-                        }
-                    })
-                    .catch(function(err) {
-                        console.error('Erreur activity:', err);
-                    })
-                    .finally(function() {
-                        buttons.forEach(function(b) { b.disabled = false; });
+            // Étape 2a : Raison maison
+            document.querySelectorAll('#step2-home .activity-btn').forEach(function(btn) {
+                btn.addEventListener('click', function() {
+                    activityState.reason = this.dataset.reason;
+                    submitActivity({
+                        category: 'maison',
+                        stayed_home_reason: activityState.reason
                     });
                 });
             });
+
+            // Retour depuis étape 2
+            document.getElementById('back-home').addEventListener('click', function() {
+                showStep('step1');
+            });
+            document.getElementById('back-outing').addEventListener('click', function() {
+                showStep('step1');
+            });
+
+            // Afficher/cacher champs texte selon checkbox
+            document.querySelectorAll('.detail-option input[type="checkbox"]').forEach(function(cb) {
+                cb.addEventListener('change', function() {
+                    var textInput = this.closest('.detail-option').querySelector('input[type="text"]');
+                    if (textInput) {
+                        if (this.checked) {
+                            textInput.classList.add('visible');
+                            textInput.focus();
+                        } else {
+                            textInput.classList.remove('visible');
+                            textInput.value = '';
+                        }
+                    }
+                });
+            });
+
+            // Étape 2b : Soumettre sortie/voyage
+            document.getElementById('submit-outing').addEventListener('click', function() {
+                var data = {
+                    category: activityState.category,
+                    films_seen: [],
+                    concerts_seen: [],
+                    expos_seen: [],
+                    note: ''
+                };
+
+                // Collecter les données
+                if (document.getElementById('opt-film').checked) {
+                    var filmTitle = document.getElementById('film-title').value.trim();
+                    if (filmTitle) data.films_seen.push(filmTitle);
+                }
+                if (document.getElementById('opt-concert').checked) {
+                    var concertDetail = document.getElementById('concert-detail').value.trim();
+                    if (concertDetail) data.concerts_seen.push(concertDetail);
+                }
+                if (document.getElementById('opt-expo').checked) {
+                    var expoDetail = document.getElementById('expo-detail').value.trim();
+                    if (expoDetail) data.expos_seen.push(expoDetail);
+                }
+
+                // Construire la note avec les autres activités
+                var notes = [];
+                if (document.getElementById('opt-rando').checked) {
+                    var randoDetail = document.getElementById('rando-detail').value.trim();
+                    notes.push('Rando' + (randoDetail ? ': ' + randoDetail : ''));
+                }
+                if (document.getElementById('opt-resto').checked) {
+                    notes.push('Restaurant');
+                }
+                if (document.getElementById('opt-balade').checked) {
+                    var baladeDetail = document.getElementById('balade-detail').value.trim();
+                    notes.push('Balade' + (baladeDetail ? ': ' + baladeDetail : ''));
+                }
+                data.note = notes.join(', ');
+
+                submitActivity(data);
+            });
+
+            function submitActivity(data) {
+                data.period_start = periodStart;
+                data.period_end = periodEnd;
+                data.period_label = periodLabel;
+
+                fetch('/activity', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data)
+                })
+                .then(function(response) { return response.json(); })
+                .then(function(result) {
+                    if (result.ok) {
+                        showConfirmation();
+                    }
+                })
+                .catch(function(err) {
+                    console.error('Erreur activity:', err);
+                });
+            }
         });
     </script>
 </body>

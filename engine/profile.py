@@ -56,7 +56,15 @@ def update_profile(key: str, value: Any) -> None:
     conn.close()
 
 
-def log_activity(period: Dict, category: str, note: str = "") -> None:
+def log_activity(
+    period: Dict,
+    category: str,
+    note: str = "",
+    films_seen: List[str] = None,
+    concerts_seen: List[str] = None,
+    expos_seen: List[str] = None,
+    stayed_home_reason: str = None
+) -> None:
     """
     Enregistre une activité pour un week-end.
 
@@ -64,6 +72,10 @@ def log_activity(period: Dict, category: str, note: str = "") -> None:
         period: Dict avec start, end, label
         category: Type d'activité (maison, travaux, sortie_locale, voyage, etc.)
         note: Commentaire optionnel
+        films_seen: Liste de titres de films vus
+        concerts_seen: Liste "Artiste - Lieu"
+        expos_seen: Liste "Expo - Lieu"
+        stayed_home_reason: Raison si resté à la maison (repos, travaux, météo, autre)
     """
     conn = get_connection()
     cursor = conn.cursor()
@@ -79,14 +91,21 @@ def log_activity(period: Dict, category: str, note: str = "") -> None:
         period_end = datetime.strptime(period_end, "%Y-%m-%d").date()
 
     cursor.execute("""
-        INSERT INTO activity_log (period_start, period_end, period_label, category, note)
-        VALUES (?, ?, ?, ?, ?)
+        INSERT INTO activity_log (
+            period_start, period_end, period_label, category, note,
+            films_seen, concerts_seen, expos_seen, stayed_home_reason
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
     """, (
         period_start.isoformat() if period_start else None,
         period_end.isoformat() if period_end else None,
         period_label,
         category,
-        note
+        note,
+        json.dumps(films_seen, ensure_ascii=False) if films_seen else None,
+        json.dumps(concerts_seen, ensure_ascii=False) if concerts_seen else None,
+        json.dumps(expos_seen, ensure_ascii=False) if expos_seen else None,
+        stayed_home_reason
     ))
 
     conn.commit()
@@ -186,13 +205,64 @@ def get_activity_stats() -> Dict[str, Any]:
     """)
     thumbs_up_types = [row["suggestion_type"] for row in cursor.fetchall()]
 
+    # Films récemment vus (10 derniers)
+    cursor.execute("""
+        SELECT films_seen FROM activity_log
+        WHERE films_seen IS NOT NULL
+        ORDER BY created_at DESC
+        LIMIT 20
+    """)
+    films_seen_recent = []
+    for row in cursor.fetchall():
+        try:
+            films = json.loads(row["films_seen"])
+            films_seen_recent.extend(films)
+        except (json.JSONDecodeError, TypeError):
+            pass
+    films_seen_recent = films_seen_recent[:10]
+
+    # Concerts récents (5 derniers)
+    cursor.execute("""
+        SELECT concerts_seen FROM activity_log
+        WHERE concerts_seen IS NOT NULL
+        ORDER BY created_at DESC
+        LIMIT 10
+    """)
+    concerts_seen_recent = []
+    for row in cursor.fetchall():
+        try:
+            concerts = json.loads(row["concerts_seen"])
+            concerts_seen_recent.extend(concerts)
+        except (json.JSONDecodeError, TypeError):
+            pass
+    concerts_seen_recent = concerts_seen_recent[:5]
+
+    # Expos récentes (5 dernières)
+    cursor.execute("""
+        SELECT expos_seen FROM activity_log
+        WHERE expos_seen IS NOT NULL
+        ORDER BY created_at DESC
+        LIMIT 10
+    """)
+    expos_seen_recent = []
+    for row in cursor.fetchall():
+        try:
+            expos = json.loads(row["expos_seen"])
+            expos_seen_recent.extend(expos)
+        except (json.JSONDecodeError, TypeError):
+            pass
+    expos_seen_recent = expos_seen_recent[:5]
+
     conn.close()
 
     return {
         "last_outing_days_ago": last_outing_days_ago,
         "streak_home": streak_home,
         "favorite_categories": favorite_categories,
-        "thumbs_up_types": thumbs_up_types
+        "thumbs_up_types": thumbs_up_types,
+        "films_seen_recent": films_seen_recent,
+        "concerts_seen_recent": concerts_seen_recent,
+        "expos_seen_recent": expos_seen_recent
     }
 
 

@@ -194,6 +194,12 @@ def activity_route():
     period_end = data.get("period_end")
     period_label = data.get("period_label", "")
 
+    # Nouveaux champs
+    films_seen = data.get("films_seen")
+    concerts_seen = data.get("concerts_seen")
+    expos_seen = data.get("expos_seen")
+    stayed_home_reason = data.get("stayed_home_reason")
+
     if not category:
         return jsonify({"error": "category requis"}), 400
 
@@ -202,7 +208,13 @@ def activity_route():
         "end": period_end,
         "label": period_label
     }
-    profile.log_activity(period, category, note)
+    profile.log_activity(
+        period, category, note,
+        films_seen=films_seen,
+        concerts_seen=concerts_seen,
+        expos_seen=expos_seen,
+        stayed_home_reason=stayed_home_reason
+    )
 
     return jsonify({"ok": True})
 
