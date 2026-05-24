@@ -32,3 +32,21 @@ HIKING_PREFS = {
     "max_drive_km": 80,
     "difficulty": ["Facile", "Moyen"]
 }
+
+# Distances approximatives depuis Guebwiller (en km)
+CITY_DISTANCES = {
+    "Guebwiller": 0,
+    "Mulhouse": 25,
+    "Colmar": 25,
+    "Strasbourg": 100,
+    "Bâle": 45,
+    "Freiburg": 50,
+    "Belfort": 55,
+    "Besançon": 120,
+    "Nancy": 150,
+    "Wattwiller": 10,
+    "Saint-Louis": 38,
+    "Erstein": 58,
+    "Riehen": 40,
+    "Wittelsheim": 12,
+}

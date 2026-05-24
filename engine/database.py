@@ -91,7 +91,7 @@ def _migrate_activity_log(cursor):
 
 
 def _populate_initial_profile(cursor):
-    """Insère le profil initial si les clés n'existent pas."""
+    """Insère ou met à jour le profil utilisateur."""
     initial_profile = {
         "music_artists": ["The Cure", "Pulp", "Fontaines D.C.", "Bertrand Belin"],
         "music_genres": ["new wave", "post-punk", "jazz", "indie rock", "pop anglaise"],
@@ -104,8 +104,10 @@ def _populate_initial_profile(cursor):
         "expo_artists": ["Soulages", "Banksy", "surréalistes"],
         "expo_style": "non-mainstream, contemporain, subversif",
         "expo_fondations": [
-            "Fondation Beyeler Bâle",
-            "Fondation Schneider Mulhouse"
+            "Fondation Beyeler Riehen/Bâle",
+            "Fondation Schneider Wattwiller",
+            "Espace Fernet-Branca Saint-Louis",
+            "Musée Würth Erstein"
         ],
         "expo_cities": ["Bâle", "Strasbourg", "Mulhouse", "Belfort", "Besançon"],
         "hike_max_elev": 300,
@@ -113,11 +115,25 @@ def _populate_initial_profile(cursor):
         "cinema_sources": ["Télérama", "Cahiers du Cinéma"]
     }
 
+    # Clés à forcer la mise à jour (même si déjà présentes)
+    force_update_keys = {"expo_fondations"}
+
     for key, value in initial_profile.items():
-        cursor.execute("""
-            INSERT OR IGNORE INTO user_profile (key, value, updated_at)
-            VALUES (?, ?, ?)
-        """, (key, json.dumps(value, ensure_ascii=False), datetime.now().isoformat()))
+        if key in force_update_keys:
+            # Mise à jour forcée via ON CONFLICT
+            cursor.execute("""
+                INSERT INTO user_profile (key, value, updated_at)
+                VALUES (?, ?, ?)
+                ON CONFLICT(key) DO UPDATE SET
+                    value = excluded.value,
+                    updated_at = excluded.updated_at
+            """, (key, json.dumps(value, ensure_ascii=False), datetime.now().isoformat()))
+        else:
+            # Insertion uniquement si absent
+            cursor.execute("""
+                INSERT OR IGNORE INTO user_profile (key, value, updated_at)
+                VALUES (?, ?, ?)
+            """, (key, json.dumps(value, ensure_ascii=False), datetime.now().isoformat()))
 
 
 # Initialiser la DB au premier import

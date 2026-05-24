@@ -20,10 +20,10 @@ TICKETMASTER_BASE_URL = "https://app.ticketmaster.com/discovery/v2/events.json"
 
 # RSS des salles locales (complément Ticketmaster)
 VENUE_RSS = {
-    "La Laiterie": "https://laiterie.artefact.org/feed",
-    "La Poudrière": "https://www.la-poudriere.com/feed",
-    "La Filature": "https://www.lafilature.org/feed",
-    "Kaserne Basel": "https://kaserne-basel.ch/feed",
+    "La Laiterie": "https://laiterie.artefact.org/agenda/feed",
+    "La Poudrière": "https://www.la-poudriere.com/agenda/feed",
+    "La Filature": "https://www.lafilature.org/feed/",
+    "Kaserne Basel": "https://kaserne-basel.ch/de/feed",
 }
 
 # Coordonnées des salles connues (pour calcul distance)
@@ -127,7 +127,7 @@ def _fetch_ticketmaster(
         "apikey": config.TICKETMASTER_API_KEY,
         "countryCode": country_code,
         "latlong": f"{BASE_LAT},{BASE_LON}",
-        "radius": 150,
+        "radius": 180,
         "unit": "km",
         "classificationName": "music",
         "startDateTime": f"{start_date.isoformat()}T00:00:00Z",
@@ -232,12 +232,13 @@ def _parse_ticketmaster_event(event: Dict) -> Optional[Dict]:
         return None
 
 
-def _fetch_rss_concerts(period: Dict) -> List[Dict]:
+def _fetch_rss_concerts(period: Dict, verbose: bool = False) -> List[Dict]:
     """
     Récupère les concerts depuis les flux RSS des salles locales.
 
     Args:
         period: Dict avec start, end
+        verbose: Si True, affiche les status HTTP
 
     Returns:
         Liste de concerts
@@ -253,6 +254,14 @@ def _fetch_rss_concerts(period: Dict) -> List[Dict]:
     concerts = []
 
     for venue_name, rss_url in VENUE_RSS.items():
+        # Log HTTP status si verbose
+        if verbose:
+            try:
+                resp = requests.head(rss_url, timeout=5, allow_redirects=True)
+                print(f"  RSS {venue_name}: HTTP {resp.status_code} — {rss_url}")
+            except requests.exceptions.RequestException as e:
+                print(f"  RSS {venue_name}: ERREUR — {e}")
+
         items = rss_reader.fetch_rss(rss_url)
 
         for item in items:
@@ -304,13 +313,14 @@ def _fetch_rss_concerts(period: Dict) -> List[Dict]:
     return concerts
 
 
-def get_concerts(period: Dict, profile: Dict) -> List[Dict]:
+def get_concerts(period: Dict, profile: Dict, verbose: bool = False) -> List[Dict]:
     """
     Récupère tous les concerts pour une période.
 
     Args:
         period: Dict avec start, end
         profile: Dict du profil utilisateur
+        verbose: Si True, affiche les détails HTTP
 
     Returns:
         Liste de concerts triée par profile_match
@@ -343,15 +353,22 @@ def get_concerts(period: Dict, profile: Dict) -> List[Dict]:
             stats["ticketmaster_de"] += 1
 
     # RSS salles locales
-    rss_concerts = _fetch_rss_concerts(period)
+    rss_concerts = _fetch_rss_concerts(period, verbose=verbose)
     all_concerts.extend(rss_concerts)
     stats["rss"] = len(rss_concerts)
 
-    # Déduplication par titre + venue
+    # Déduplication : même titre (normalisé) + venue → garder celui avec heure définie
+    # Normaliser le titre : prendre la partie avant " | " (ignore variantes billets)
+    def normalize_title(title: str) -> str:
+        return title.split(" | ")[0].lower().strip()
+
+    # Trier pour que les entrées avec heure passent avant "NC"
+    all_concerts.sort(key=lambda c: (normalize_title(c["title"]), c["venue"].lower(), c["time"] == "NC"))
+
     seen = set()
     unique_concerts = []
     for concert in all_concerts:
-        key = (concert["title"].lower(), concert["venue"].lower())
+        key = (normalize_title(concert["title"]), concert["venue"].lower())
         if key not in seen:
             seen.add(key)
             unique_concerts.append(concert)
