@@ -4,7 +4,7 @@ from datetime import datetime
 from typing import Dict, List
 
 from engine import calendar_engine, profile
-from collectors import weather, cinema, events, hiking, travel, concerts, exhibitions
+from collectors import weather, cinema, events, hiking, travel, concerts, exhibitions, discovery
 
 
 BASE_SYSTEM_PROMPT = """Tu es un assistant personnel de loisirs pour un couple
@@ -28,9 +28,9 @@ suggestion prioritaire avec une description enthousiaste.
 
 Ne jamais exposer la mécanique de scoring dans les suggestions.
 
-Parmi les suggestions, inclure au moins une proposition surprenante
-issue des sources généralistes — quelque chose que l'utilisateur
-n'aurait pas cherché lui-même mais qui pourrait l'intéresser.
+Inclure au moins une suggestion "découverte" issue des bons plans
+locaux — quelque chose d'inattendu, léger, sans préparation.
+Ne pas forcer si rien de pertinent n'est disponible.
 Présente-la comme une découverte.
 
 Tu proposes des idées concrètes, bien argumentées,
@@ -269,7 +269,7 @@ Mélange city breaks proches et destinations plus lointaines si la durée le per
 {request}"""
 
 
-def _build_user_prompt(period: Dict, weather_data: Dict, movies: List[Dict], events_list: List[Dict], hikes: List[Dict], concerts_list: List[Dict] = None, exhibitions_list: List[Dict] = None) -> str:
+def _build_user_prompt(period: Dict, weather_data: Dict, movies: List[Dict], events_list: List[Dict], hikes: List[Dict], concerts_list: List[Dict] = None, exhibitions_list: List[Dict] = None, discovery_list: List[Dict] = None) -> str:
     """Construit le prompt utilisateur complet."""
     period_info = f"""Période : {period['label']}
 Dates : du {period['start'].strftime('%d/%m/%Y')} au {period['end'].strftime('%d/%m/%Y')}
@@ -282,6 +282,7 @@ Mode : {period['mode']}"""
     hiking_context = _format_hiking_context(hikes)
     concerts_context = concerts.format_concerts_context(concerts_list) if concerts_list else ""
     exhibitions_context = exhibitions.format_exhibitions_context(exhibitions_list) if exhibitions_list else ""
+    discovery_context = discovery.format_discovery_context(discovery_list) if discovery_list else ""
 
     request = """Propose 3 à 5 suggestions pour cette période.
 
@@ -303,9 +304,9 @@ Réponds UNIQUEMENT en JSON valide avec ce format exact :
 Valeurs possibles :
 - day : "Samedi", "Dimanche", "Lundi", "Flexible"
 - logistics : "Spontané", "À réserver", "À planifier"
-- type : "cinema", "rando", "culture", "exposition", "gastronomie", "concert", "autre"
+- type : "cinema", "rando", "culture", "exposition", "gastronomie", "concert", "découverte", "autre"
 
-Privilégie la variété : mélange cinéma, randonnée, exposition, concert, gastronomie si possible."""
+Privilégie la variété : mélange cinéma, randonnée, exposition, concert, découverte si possible."""
 
     return f"""{period_info}
 
@@ -320,6 +321,8 @@ Privilégie la variété : mélange cinéma, randonnée, exposition, concert, ga
 {concerts_context}
 
 {exhibitions_context}
+
+{discovery_context}
 
 {request}"""
 
@@ -347,6 +350,7 @@ def generate_suggestions(period: Dict) -> Dict:
         hikes = []
         concerts_list = []
         exhibitions_list = []
+        discovery_list = []
     else:
         # Mode week-end : suggestions locales
         user_profile = profile.get_profile()
@@ -356,7 +360,8 @@ def generate_suggestions(period: Dict) -> Dict:
         hikes = hiking.get_hiking_suggestions(period, weather_data)
         concerts_list = concerts.get_concerts(period, user_profile)
         exhibitions_list = exhibitions.get_exhibitions(period, user_profile)
-        user_prompt = _build_user_prompt(period, weather_data, movies, events_list, hikes, concerts_list, exhibitions_list)
+        discovery_list = discovery.get_discovery_events(period)
+        user_prompt = _build_user_prompt(period, weather_data, movies, events_list, hikes, concerts_list, exhibitions_list, discovery_list)
         system_prompt = BASE_SYSTEM_PROMPT.format(profile_section=profile_section)
         travel_data = {}
 
@@ -408,6 +413,7 @@ def generate_suggestions(period: Dict) -> Dict:
         "hikes": hikes[:3] if hikes else [],
         "concerts": concerts_list[:5] if concerts_list else [],
         "exhibitions": exhibitions_list[:4] if exhibitions_list else [],
+        "discovery": discovery_list[:4] if discovery_list else [],
         "travel": travel_data if is_vacation else {},
         "is_vacation": is_vacation,
         "suggestions": suggestions,
