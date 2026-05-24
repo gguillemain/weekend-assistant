@@ -35,18 +35,32 @@ HIKING_PREFS = {
 
 # Distances approximatives depuis Guebwiller (en km)
 CITY_DISTANCES = {
+    # Alsace
     "Guebwiller": 0,
     "Mulhouse": 25,
     "Colmar": 25,
     "Strasbourg": 100,
-    "Bâle": 45,
-    "Freiburg": 50,
-    "Belfort": 55,
-    "Besançon": 120,
-    "Nancy": 150,
     "Wattwiller": 10,
     "Saint-Louis": 38,
     "Erstein": 58,
-    "Riehen": 40,
     "Wittelsheim": 12,
+    # Suisse
+    "Bâle": 45,
+    "Basel": 45,
+    "Riehen": 40,
+    # Allemagne - Bade-Wurtemberg
+    "Freiburg": 50,
+    "Breisach": 35,
+    "Emmendingen": 55,
+    "Offenburg": 75,
+    "Lahr": 65,
+    "Kehl": 90,
+    "Baden-Baden": 100,
+    "Lörrach": 50,
+    "Weil am Rhein": 45,
+    "Bad Krozingen": 45,
+    # France - autres
+    "Belfort": 55,
+    "Besançon": 120,
+    "Nancy": 150,
 }

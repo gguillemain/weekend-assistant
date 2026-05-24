@@ -23,15 +23,17 @@ HEADERS = {
     "Accept-Language": "fr-FR,fr;q=0.9,de;q=0.8,en;q=0.7",
 }
 
-# Catégories connues
+# Catégories connues (FR + DE)
 CATEGORY_KEYWORDS = {
-    "gastronomie": ["restaurant", "gastronomie", "dégustation", "vin", "bière", "food", "cuisine", "marché gourmand", "brunch"],
-    "marche": ["marché", "brocante", "vide-grenier", "puces", "artisanat", "markt"],
-    "festival": ["festival", "fête", "fest", "kermesse", "carnaval", "fasching"],
-    "sport": ["sport", "course", "marathon", "vélo", "cyclisme", "trail", "randonnée sportive", "triathlon"],
-    "nature": ["nature", "jardin", "parc", "balade", "promenade", "forêt", "observation"],
-    "patrimoine": ["patrimoine", "visite guidée", "château", "église", "historique", "monument", "journées"],
-    "insolite": ["insolite", "escape", "énigme", "mystère", "secret", "underground", "alternatif"],
+    "gastronomie": ["restaurant", "gastronomie", "dégustation", "vin", "bière", "food", "cuisine", "marché gourmand", "brunch", "wein", "kulinarisch", "genuss"],
+    "marche": ["marché", "brocante", "vide-grenier", "puces", "artisanat", "markt", "flohmarkt", "wochenmarkt"],
+    "festival": ["festival", "fête", "fest", "kermesse", "carnaval", "fasching", "volksfest", "weinfest", "stadtfest"],
+    "sport": ["sport", "course", "marathon", "vélo", "cyclisme", "trail", "randonnée sportive", "triathlon", "lauf", "radtour", "wanderung"],
+    "nature": ["nature", "jardin", "parc", "balade", "promenade", "forêt", "observation", "schwarzwald", "natur", "garten", "wald"],
+    "patrimoine": ["patrimoine", "visite guidée", "château", "église", "historique", "monument", "journées", "schloss", "münster", "führung", "museum"],
+    "insolite": ["insolite", "escape", "énigme", "mystère", "secret", "underground", "alternatif", "geheimnis", "besonders"],
+    "concert": ["concert", "konzert", "musik", "live", "jazz", "klassik", "orchester"],
+    "theatre": ["théâtre", "theater", "schauspiel", "aufführung", "vorstellung"],
 }
 
 
@@ -45,7 +47,13 @@ def _get_distance(city: str) -> float:
             return float(dist)
     # Estimations pour villes courantes non listées
     estimates = {
-        "basel": 45, "bâle": 45, "freiburg": 50, "fribourg": 50,
+        # Suisse
+        "basel": 45, "bâle": 45,
+        # Allemagne
+        "freiburg": 50, "fribourg": 50, "breisach": 35, "emmendingen": 55,
+        "offenburg": 75, "lahr": 65, "kehl": 90, "baden-baden": 100,
+        "lörrach": 50, "weil am rhein": 45, "bad krozingen": 45,
+        # France
         "sélestat": 50, "obernai": 70, "haguenau": 120,
     }
     for name, dist in estimates.items():
@@ -489,6 +497,56 @@ def _fetch_dna_rss(feed_name: str, url: str, verbose: bool = False) -> List[Dict
 
 
 # =============================================================================
+# SOURCES ALLEMANDES (Freiburg / Baden-Württemberg)
+# =============================================================================
+
+def _fetch_freiburg_rss(verbose: bool = False) -> List[Dict]:
+    """Récupère les événements Freiburg via RSS."""
+    events = []
+
+    # Sources RSS Freiburg
+    rss_sources = [
+        ("Freiburg Kultur", "https://www.freiburg.de/pb/,Lde/rss/veranstaltungen.xml"),
+        ("Badische Zeitung", "https://www.badische-zeitung.de/freiburg/rss-feed"),
+    ]
+
+    for source_name, url in rss_sources:
+        try:
+            items = rss_reader.fetch_rss(url)
+            if verbose:
+                print(f"  {source_name}: {len(items)} items")
+
+            for item in items:
+                title = item.get("title", "")
+                if not title:
+                    continue
+
+                description = item.get("description", "")
+                category = _detect_category(title, description)
+                pub_date = item.get("published")
+
+                events.append({
+                    "title": title,
+                    "category": category,
+                    "date_start": pub_date.date() if isinstance(pub_date, datetime) else None,
+                    "date_end": None,
+                    "city": "Freiburg",
+                    "distance_km": 50.0,  # ~50km depuis Guebwiller
+                    "price": _extract_price(description),
+                    "description": description[:300] if description else "",
+                    "url": item.get("link", ""),
+                    "source": source_name,
+                    "surprise_score": 0.0
+                })
+
+        except Exception as e:
+            if verbose:
+                print(f"  {source_name}: ERREUR — {e}")
+
+    return events
+
+
+# =============================================================================
 # FONCTION PRINCIPALE
 # =============================================================================
 
@@ -576,6 +634,11 @@ def get_discovery_events(period: Dict, verbose: bool = False) -> List[Dict]:
         stats["OpenAgenda"] = f"ERREUR: {e}"
         if verbose:
             print(f"  OpenAgenda: ERREUR — {e}")
+
+    # Source 7 — Freiburg (Allemagne)
+    events = _fetch_freiburg_rss(verbose)
+    stats["Freiburg"] = f"{len(events)} items"
+    all_events.extend(events)
 
     if verbose:
         print()

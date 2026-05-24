@@ -21,7 +21,10 @@
       "Bash(git commit:*)",
       "Bash(python -m json.tool:*)",
       "Bash(\"\\) + venue\n- Priorité aux entrées avec heure définie sur \"NC\"\n- Ajout verbose mode pour logging HTTP des RSS\n- Radius Ticketmaster passé à 180km\n- Mise à jour expo_fondations \\(Beyeler, Schneider, Fernet-Branca, Würth\\)\n- Ajout CITY_DISTANCES dans config.py\n\nCo-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>\nEOF\n\\)\")",
-      "WebFetch(domain:atlasflux.saynete.net)"
+      "WebFetch(domain:atlasflux.saynete.net)",
+      "Bash(FLASK_RUN_PORT=5000 python:*)",
+      "Bash(python3:*)",
+      "WebFetch(domain:openagenda.com)"
     ]
   }
 }

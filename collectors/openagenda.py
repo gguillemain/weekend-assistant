@@ -14,6 +14,7 @@ BASE_URL = "https://api.openagenda.com/v2"
 
 # Agendas à suivre (IDs OpenAgenda)
 AGENDAS = {
+    # France - Alsace
     "Haut-Rhin": 5882837,        # Haut-Rhin Tourisme
     "Alsace": 26674538,          # Visit Alsace
     "Mulhouse": 73920981,        # Ville de Mulhouse
