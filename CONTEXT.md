@@ -1,7 +1,7 @@
 # Weekend Assistant - Contexte de reprise
 
 > Assistant personnel de loisirs pour un couple d'enseignants alsaciens (Guebwiller, Haut-Rhin).
-> Génère des suggestions de week-end basées sur la météo, les films, événements et randonnées.
+> Génère des suggestions de week-end basées sur la météo, les films, événements, randonnées, concerts et expositions.
 
 ## 1. Architecture du projet
 
@@ -29,7 +29,8 @@ weekend_assistant/
 │   ├── events.py             # Scraping JDS, Strasbourg, Visit Alsace
 │   ├── hiking.py             # Scraping Visorando
 │   ├── travel.py             # Destinations city break / Eurotrip
-│   ├── concerts.py           # Ticketmaster API + RSS salles locales
+│   ├── concerts.py           # Ticketmaster API (FR/CH/DE, 180km)
+│   ├── exhibitions.py        # Scraping fondations/musées (6 sources)
 │   └── rss_reader.py         # Utilitaire parsing RSS/Atom
 │
 ├── templates/
@@ -54,7 +55,10 @@ weekend_assistant/
 | `cinema.py` | 3 cinémas : Le Florival, Bel-Air (Mulhouse), Le Palace (Colmar) | RSS Télérama avec matching strict (★★★★+) |
 | `events.py` | JDS Alsace, Strasbourg.eu, Visit Alsace | Architecture RSS + fallback scraping |
 | `hiking.py` | Visorando Haut-Rhin | Filtrage dénivelé max 300m, distance max 80km |
-| `suggest.py` | Génération suggestions via Claude API | Sortie JSON structurée |
+| `concerts.py` | Ticketmaster API (FR/CH/DE) | Rayon 180km, déduplication titre+venue, profile_match |
+| `exhibitions.py` | 6 sources : Beyeler, Schneider, Fernet-Branca, Würth, Strasbourg, Kunstmuseum | 29 expos, profile_match (fondations + style) |
+| `suggest.py` | Génération suggestions via Claude API | Sortie JSON structurée, intègre concerts + expos |
+| `profile.py` | Profil utilisateur, feedback, journal d'activités | Films/concerts/expos vus, streak_home |
 | `index.html` | Interface magazine-style | Responsive, badges colorés, boutons feedback |
 
 ### Partiellement fonctionnel (⚠)
@@ -67,11 +71,9 @@ weekend_assistant/
 
 ### Non implémenté (○)
 
-- Feedback 👍/👎 (HTML présent, pas de backend)
-- SQLite activity log
-- Scheduler email mercredi
-- Mode vacances (suggestions voyage)
 - Notes Visorando (non visibles dans les cartes)
+- Cache Redis/fichier pour réduire scraping
+- Tests unitaires collectors
 
 ## 3. Problèmes connus et contournements
 
@@ -97,31 +99,41 @@ weekend_assistant/
 
 ## 4. Prochaines étapes
 
-### Phase 1 - Consolidation
+### Phase 1 - Consolidation ✓
 - [x] Parsing JSON suggestions
 - [x] Cartes HTML avec badges colorés
 - [x] Feedback 👍/👎 fonctionnel (POST /feedback)
 - [x] SQLite activity log (`data/activity.db`)
 
-### Phase 2 - Automatisation
+### Phase 2 - Automatisation ✓
 - [x] Scheduler email mercredi (APScheduler)
 - [x] Template email HTML
 - [x] Configuration SMTP dans .env
 
-### Phase 3 - Mode vacances
+### Phase 3 - Mode vacances ✓
 - [x] Détection `period.mode == "vacances"`
 - [x] Suggestions voyage (Eurotrip, city break)
 - [ ] Intégration booking/train (optionnel, futur)
 
-### Phase 4 - Améliorations
+### Phase 4 - Profil & Journal ✓
 - [x] Journal d'activité enrichi (films, concerts, expos vus)
 - [x] Widget formulaire progressif
 - [x] Historique injecté dans prompt Claude
+- [x] Profil utilisateur (artistes, genres, fondations)
+
+### Phase 5 - Concerts & Expositions ✓
+- [x] Collector concerts (Ticketmaster FR/CH/DE, 180km)
+- [x] Déduplication titre normalisé + venue
+- [x] Collector exhibitions (6 sources, 29 expos)
+- [x] profile_match (artistes favoris, fondations, style)
+- [x] Intégration suggest.py + prompt Claude
+
+### Phase 6 - Améliorations
 - [ ] Visorando : notes, photos, GPX
 - [ ] Cache Redis/fichier pour réduire scraping
 - [ ] Tests unitaires collectors
 
-### Phase 5 - Déploiement
+### Phase 7 - Déploiement
 - [ ] VPS OVH (ou autre)
 - [ ] Gunicorn + Nginx
 - [ ] HTTPS Let's Encrypt
@@ -183,7 +195,44 @@ python-dotenv
 anthropic
 ```
 
-## 8. Palette couleurs (CSS)
+## 8. Profil utilisateur
+
+Le profil est stocké dans SQLite (`data/preferences.db`) et injecté dans le prompt Claude :
+
+```python
+# Musique (pour concerts)
+music_artists: ["The Cure", "Pulp", "Fontaines D.C.", "Bertrand Belin"]
+music_genres: ["new wave", "post-punk", "jazz", "indie rock"]
+music_venues: ["La Laiterie", "Kaserne Basel", "Parc Expo Mulhouse"]
+
+# Expositions
+expo_artists: ["Soulages", "Banksy", "surréalistes"]
+expo_style: "non-mainstream, contemporain, subversif"
+expo_fondations: [
+    "Fondation Beyeler Riehen/Bâle",
+    "Fondation Schneider Wattwiller",
+    "Espace Fernet-Branca Saint-Louis",
+    "Musée Würth Erstein"
+]
+```
+
+**profile_match** (0-1) :
+- +0.5 artiste favori
+- +0.3 fondation favorite
+- +0.2 style correspondant
+
+## 9. Distances (config.py)
+
+```python
+CITY_DISTANCES = {
+    "Guebwiller": 0, "Wattwiller": 10, "Wittelsheim": 12,
+    "Mulhouse": 25, "Colmar": 25, "Saint-Louis": 38,
+    "Riehen": 40, "Bâle": 45, "Freiburg": 50, "Belfort": 55,
+    "Erstein": 58, "Strasbourg": 100, "Besançon": 120, "Nancy": 150
+}
+```
+
+## 10. Palette couleurs (CSS)
 
 | Couleur | Hex | Usage |
 |---------|-----|-------|
@@ -195,5 +244,5 @@ anthropic
 
 ---
 
-*Dernière mise à jour : 23/05/2026*
-*Commit initial : ba235c2 (feat: MVP weekend_assistant)*
+*Dernière mise à jour : 24/05/2026*
+*Commits : ba235c2 (MVP) → eb0941f (exhibitions)*
