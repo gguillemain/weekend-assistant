@@ -438,43 +438,43 @@ def _fetch_basel_agenda(verbose: bool = False) -> List[Dict]:
         return []
 
 
-def _scrape_timeout_basel(verbose: bool = False) -> List[Dict]:
-    """Scrape Timeout Basel."""
-    url = "https://www.timeout.com/basel/things-to-do"
-    source = "Timeout Basel"
+def _fetch_dna_rss(feed_name: str, url: str, verbose: bool = False) -> List[Dict]:
+    """Récupère les événements DNA via RSS."""
+    source = f"DNA {feed_name}"
     events = []
 
     try:
-        resp = requests.get(url, headers=HEADERS, timeout=15)
+        items = rss_reader.fetch_rss(url)
         if verbose:
-            print(f"  {source} scraping: HTTP {resp.status_code}")
-        resp.raise_for_status()
+            print(f"  {source}: {len(items)} items")
 
-        soup = BeautifulSoup(resp.content, "lxml")
-
-        for item in soup.select("article, .card, [class*='tile'], [class*='article']"):
-            title_el = item.select_one("h2, h3, .title, [class*='title']")
-            if not title_el:
+        for item in items:
+            title = item.get("title", "")
+            if not title:
                 continue
 
-            title = title_el.get_text(strip=True)
-            if not title or len(title) < 5:
-                continue
+            description = item.get("description", "")
+            category = _detect_category(title, description)
+            pub_date = item.get("published")
 
-            desc_el = item.select_one("p, .description, [class*='summary']")
-            description = desc_el.get_text(strip=True)[:300] if desc_el else ""
-            link_el = item.select_one("a[href]")
+            # Extraire la ville depuis le titre (format "Ville. Titre...")
+            city = "Alsace"
+            if ". " in title:
+                potential_city = title.split(". ")[0].strip()
+                if len(potential_city) < 30 and potential_city[0].isupper():
+                    city = potential_city
+                    title = ". ".join(title.split(". ")[1:])
 
             events.append({
                 "title": title,
-                "category": _detect_category(title, description),
-                "date_start": None,
+                "category": category,
+                "date_start": pub_date.date() if isinstance(pub_date, datetime) else None,
                 "date_end": None,
-                "city": "Bâle",
-                "distance_km": _get_distance("Bâle"),
-                "price": "NC",
-                "description": description,
-                "url": link_el.get("href", url) if link_el else url,
+                "city": city,
+                "distance_km": _get_distance(city),
+                "price": _extract_price(description),
+                "description": description[:300] if description else "",
+                "url": item.get("link", ""),
                 "source": source,
                 "surprise_score": 0.0
             })
@@ -483,7 +483,7 @@ def _scrape_timeout_basel(verbose: bool = False) -> List[Dict]:
 
     except Exception as e:
         if verbose:
-            print(f"  {source} scraping: ERREUR — {e}")
+            print(f"  {source}: ERREUR — {e}")
         return []
 
 
@@ -513,37 +513,29 @@ def get_discovery_events(period: Dict, verbose: bool = False) -> List[Dict]:
     all_events = []
     stats = {}
 
-    # Source 1 — JDS Mulhouse
-    events = _fetch_jds_rss("mulhouse", verbose)
-    if not events:
-        events = _scrape_jds("mulhouse", verbose)
-        stats["JDS Mulhouse"] = f"scraping ({len(events)})"
-    else:
-        stats["JDS Mulhouse"] = f"RSS ({len(events)})"
+    # Source 1 — DNA Culture-Loisirs
+    events = _fetch_dna_rss("Culture-Loisirs", "https://www.dna.fr/culture-loisirs/rss", verbose)
+    stats["DNA Culture-Loisirs"] = f"{len(events)} items"
     all_events.extend(events)
 
-    # Source 2 — JDS Colmar
-    events = _fetch_jds_rss("colmar", verbose)
-    if not events:
-        events = _scrape_jds("colmar", verbose)
-        stats["JDS Colmar"] = f"scraping ({len(events)})"
-    else:
-        stats["JDS Colmar"] = f"RSS ({len(events)})"
+    # Source 2 — DNA Insolite
+    events = _fetch_dna_rss("Insolite", "https://www.dna.fr/insolite/rss", verbose)
+    stats["DNA Insolite"] = f"{len(events)} items"
     all_events.extend(events)
 
-    # Source 3 — Tourisme Alsace
+    # Source 3 — DNA Tourisme & Patrimoine
+    events = _fetch_dna_rss("Tourisme", "https://www.dna.fr/magazine-tourisme-et-patrimoine/rss", verbose)
+    stats["DNA Tourisme"] = f"{len(events)} items"
+    all_events.extend(events)
+
+    # Source 4 — DNA Gastronomie
+    events = _fetch_dna_rss("Gastronomie", "https://www.dna.fr/culture-loisirs/gastronomie/rss", verbose)
+    stats["DNA Gastronomie"] = f"{len(events)} items"
+    all_events.extend(events)
+
+    # Source 5 — Tourisme Alsace
     events = _fetch_tourisme_alsace(verbose)
     stats["Tourisme Alsace"] = f"{len(events)} events"
-    all_events.extend(events)
-
-    # Source 4 — Basel Agenda
-    events = _fetch_basel_agenda(verbose)
-    stats["Basel Agenda"] = f"{len(events)} events"
-    all_events.extend(events)
-
-    # Source 5 — Timeout Basel
-    events = _scrape_timeout_basel(verbose)
-    stats["Timeout Basel"] = f"scraping ({len(events)})"
     all_events.extend(events)
 
     if verbose:
