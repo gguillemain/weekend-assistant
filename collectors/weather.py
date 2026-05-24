@@ -2,6 +2,7 @@ import requests
 from datetime import datetime, date
 from typing import Dict, List, Optional
 import config
+from engine.cache import cache_get, cache_set, CACHE_TTL
 
 
 WEEKDAY_LABELS = {
@@ -43,6 +44,19 @@ def get_weather_forecast(period: Dict) -> Dict:
     if not api_key:
         error_result["error"] = "Clé API OpenWeatherMap non configurée"
         return error_result
+
+    # Clé de cache basée sur la période
+    period_start = period.get("start")
+    period_end = period.get("end")
+    cache_key = f"weather_{period_start}_{period_end}"
+
+    # Vérifier le cache
+    cached = cache_get(cache_key)
+    if cached:
+        print("  Météo : CACHE HIT")
+        return cached
+
+    print("  Météo : CACHE MISS → appel API")
 
     # Appel API OpenWeatherMap forecast
     url = "https://api.openweathermap.org/data/2.5/forecast"
@@ -108,13 +122,18 @@ def get_weather_forecast(period: Dict) -> Dict:
     # Générer le résumé
     summary = _generate_summary(days)
 
-    return {
+    result = {
         "location": city,
         "period_label": period.get("label", ""),
         "days": days,
         "summary": summary,
         "best_day": best_day
     }
+
+    # Mettre en cache
+    cache_set(cache_key, result, CACHE_TTL.get("weather", 180))
+
+    return result
 
 
 def _group_forecasts_by_day(forecasts: List[Dict], start: date, end: date) -> Dict[date, List[Dict]]:

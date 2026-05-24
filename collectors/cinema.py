@@ -6,6 +6,7 @@ import re
 import time
 
 from collectors.rss_reader import fetch_rss, try_rss_urls
+from engine.cache import cache_get, cache_set, CACHE_TTL
 
 
 # Configuration des cinémas à scraper
@@ -403,6 +404,20 @@ def get_cahiers_info(title: str) -> bool:
 
 def get_artetal_movies(period: Dict) -> List[Dict]:
     """Récupère les films Art & Essai des cinémas proches de Guebwiller."""
+    period_start = period["start"]
+    period_end = period["end"]
+
+    # Clé de cache
+    cache_key = f"cinema_{period_start}_{period_end}"
+
+    # Vérifier le cache
+    cached = cache_get(cache_key)
+    if cached:
+        print("  Cinéma : CACHE HIT")
+        return cached
+
+    print("  Cinéma : CACHE MISS → scraping")
+
     # Récupérer les recommandations éditoriales
     fetch_telerama_picks()
     fetch_cahiers_picks()
@@ -411,8 +426,6 @@ def get_artetal_movies(period: Dict) -> List[Dict]:
     _print_sources_status()
 
     all_movies = []
-    period_start = period["start"]
-    period_end = period["end"]
 
     for cinema in CINEMAS:
         try:
@@ -453,6 +466,10 @@ def get_artetal_movies(period: Dict) -> List[Dict]:
         return -priority
 
     filtered_movies.sort(key=sort_key)
+
+    # Mettre en cache
+    cache_set(cache_key, filtered_movies, CACHE_TTL.get("cinema", 360))
+
     return filtered_movies
 
 

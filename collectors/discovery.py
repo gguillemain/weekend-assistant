@@ -11,6 +11,7 @@ import re
 
 import config
 from collectors import rss_reader
+from engine.cache import cache_get, cache_set, CACHE_TTL
 
 # Distances depuis Guebwiller
 CITY_DISTANCES = getattr(config, "CITY_DISTANCES", {})
@@ -510,6 +511,17 @@ def get_discovery_events(period: Dict, verbose: bool = False) -> List[Dict]:
     if isinstance(end_date, str):
         end_date = datetime.strptime(end_date, "%Y-%m-%d").date()
 
+    # Clé de cache
+    cache_key = f"discovery_{start_date}_{end_date}"
+
+    # Vérifier le cache
+    cached = cache_get(cache_key)
+    if cached:
+        print("  Discovery : CACHE HIT")
+        return cached
+
+    print("  Discovery : CACHE MISS → scraping")
+
     all_events = []
     stats = {}
 
@@ -537,6 +549,33 @@ def get_discovery_events(period: Dict, verbose: bool = False) -> List[Dict]:
     events = _fetch_tourisme_alsace(verbose)
     stats["Tourisme Alsace"] = f"{len(events)} events"
     all_events.extend(events)
+
+    # Source 6 — OpenAgenda
+    try:
+        from collectors.openagenda import get_openagenda_events
+        oa_events = get_openagenda_events(period, verbose=verbose)
+        # Convertir au format discovery
+        for oa in oa_events:
+            all_events.append({
+                "title": oa["title"],
+                "category": oa["category"],
+                "date_start": oa["date_start"],
+                "date_end": oa["date_end"],
+                "city": oa["city"],
+                "distance_km": oa["distance_km"],
+                "price": oa["price"],
+                "description": oa["description"],
+                "url": oa["url"],
+                "source": oa["source"],
+                "surprise_score": oa["surprise_score"]
+            })
+        stats["OpenAgenda"] = f"{len(oa_events)} events"
+        if verbose:
+            print(f"  OpenAgenda: {len(oa_events)} events")
+    except Exception as e:
+        stats["OpenAgenda"] = f"ERREUR: {e}"
+        if verbose:
+            print(f"  OpenAgenda: ERREUR — {e}")
 
     if verbose:
         print()
@@ -571,6 +610,9 @@ def get_discovery_events(period: Dict, verbose: bool = False) -> List[Dict]:
 
     # Trier par surprise_score décroissant
     unique_events.sort(key=lambda x: -x["surprise_score"])
+
+    # Mettre en cache
+    cache_set(cache_key, unique_events, CACHE_TTL.get("discovery", 240))
 
     return unique_events
 

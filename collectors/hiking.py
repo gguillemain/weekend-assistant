@@ -5,6 +5,7 @@ from typing import Dict, List, Optional
 import re
 
 import config
+from engine.cache import cache_get, cache_set, CACHE_TTL
 
 
 HEADERS = {
@@ -320,7 +321,30 @@ def get_hiking_suggestions(period: Dict, weather_data: Optional[Dict] = None) ->
     """
     Récupère les suggestions de randonnée pour une période donnée.
     """
-    print("  Scraping randonnées Visorando...")
+    period_start = period.get("start", "")
+    period_end = period.get("end", "")
+
+    # Clé de cache (sans météo car elle change)
+    cache_key = f"hiking_{period_start}_{period_end}"
+
+    # Vérifier le cache
+    cached = cache_get(cache_key)
+    if cached:
+        print("  Randonnées : CACHE HIT")
+        # Recalculer le weather_score avec les nouvelles données météo
+        best_weather_day = None
+        if weather_data and weather_data.get("days"):
+            days = weather_data["days"]
+            suitable_days = [d for d in days if d.get("suitable_outdoor", False)]
+            if suitable_days:
+                best_weather_day = suitable_days[0]
+            elif days:
+                best_weather_day = days[0]
+        for hike in cached:
+            hike["weather_score"] = _calculate_weather_score(hike, best_weather_day)
+        return cached
+
+    print("  Randonnées : CACHE MISS → scraping Visorando")
 
     hikes = _scrape_visorando()
 
@@ -353,6 +377,9 @@ def get_hiking_suggestions(period: Dict, weather_data: Optional[Dict] = None) ->
     hikes.sort(key=sort_key)
 
     print(f"  Randonnées : {len(hikes)} trouvées")
+
+    # Mettre en cache
+    cache_set(cache_key, hikes, CACHE_TTL.get("hiking", 1440))
 
     return hikes
 

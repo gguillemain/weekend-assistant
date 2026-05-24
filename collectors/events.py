@@ -8,6 +8,7 @@ import math
 
 from collectors.rss_reader import fetch_rss, try_rss_urls
 import config
+from engine.cache import cache_get, cache_set, CACHE_TTL
 
 
 HEADERS = {
@@ -575,7 +576,16 @@ def get_local_events(period: Dict) -> List[Dict]:
     period_start = period["start"]
     period_end = period["end"]
 
-    print("  Scraping événements...")
+    # Clé de cache
+    cache_key = f"events_{period_start}_{period_end}"
+
+    # Vérifier le cache
+    cached = cache_get(cache_key)
+    if cached:
+        print("  Événements : CACHE HIT")
+        return cached
+
+    print("  Événements : CACHE MISS → scraping")
 
     all_events = []
 
@@ -602,6 +612,9 @@ def get_local_events(period: Dict) -> List[Dict]:
 
     # Trier par score décroissant
     all_events.sort(key=lambda x: x["score"], reverse=True)
+
+    # Mettre en cache
+    cache_set(cache_key, all_events, CACHE_TTL.get("events", 360))
 
     return all_events
 

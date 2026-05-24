@@ -9,6 +9,7 @@ from typing import Dict, List, Optional
 import re
 
 import config
+from engine.cache import cache_get, cache_set, CACHE_TTL
 
 # Distances depuis Guebwiller
 CITY_DISTANCES = getattr(config, "CITY_DISTANCES", {})
@@ -678,6 +679,27 @@ def get_exhibitions(period: Dict, profile: Dict, verbose: bool = False) -> List[
     if isinstance(end_date, str):
         end_date = datetime.strptime(end_date, "%Y-%m-%d").date()
 
+    # Clé de cache
+    cache_key = f"exhibitions_{start_date}_{end_date}"
+
+    # Vérifier le cache
+    cached = cache_get(cache_key)
+    if cached:
+        print("  Expositions : CACHE HIT")
+        # Recalculer profile_match avec le profil actuel
+        for expo in cached:
+            expo["profile_match"] = _calculate_profile_match(
+                expo["title"],
+                expo["artists"],
+                expo["description"],
+                expo["venue"],
+                profile
+            )
+        cached.sort(key=lambda x: (-x["profile_match"], x["distance_km"]))
+        return cached
+
+    print("  Expositions : CACHE MISS → scraping")
+
     all_exhibitions = []
     stats = {}
 
@@ -760,6 +782,9 @@ def get_exhibitions(period: Dict, profile: Dict, verbose: bool = False) -> List[
 
     # Trier par profile_match décroissant, puis distance
     filtered.sort(key=lambda x: (-x["profile_match"], x["distance_km"]))
+
+    # Mettre en cache
+    cache_set(cache_key, filtered, CACHE_TTL.get("exhibitions", 720))
 
     return filtered
 

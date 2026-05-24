@@ -9,6 +9,7 @@ from math import radians, sin, cos, sqrt, atan2
 
 import config
 from collectors import rss_reader
+from engine.cache import cache_get, cache_set, CACHE_TTL
 
 
 # Coordonnées de base (Guebwiller)
@@ -325,6 +326,29 @@ def get_concerts(period: Dict, profile: Dict, verbose: bool = False) -> List[Dic
     Returns:
         Liste de concerts triée par profile_match
     """
+    start_date = period.get("start")
+    end_date = period.get("end")
+
+    # Clé de cache
+    cache_key = f"concerts_{start_date}_{end_date}"
+
+    # Vérifier le cache
+    cached = cache_get(cache_key)
+    if cached:
+        print("  Concerts : CACHE HIT")
+        # Recalculer profile_match avec le profil actuel
+        for concert in cached:
+            concert["profile_match"] = _calculate_profile_match(
+                concert["artist"],
+                concert["genre"],
+                concert["venue"],
+                profile
+            )
+        cached.sort(key=lambda x: (-x["profile_match"], x["distance_km"]))
+        return cached
+
+    print("  Concerts : CACHE MISS → appel API")
+
     all_concerts = []
     stats = {"ticketmaster_fr": 0, "ticketmaster_ch": 0, "ticketmaster_de": 0, "rss": 0}
 
@@ -384,6 +408,9 @@ def get_concerts(period: Dict, profile: Dict, verbose: bool = False) -> List[Dic
 
     # Trier par profile_match décroissant
     unique_concerts.sort(key=lambda x: (-x["profile_match"], x["distance_km"]))
+
+    # Mettre en cache
+    cache_set(cache_key, unique_concerts, CACHE_TTL.get("concerts", 360))
 
     return unique_concerts
 

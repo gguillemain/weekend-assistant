@@ -17,7 +17,11 @@
       "Bash(xargs kill:*)",
       "WebFetch(domain:www.visorando.com)",
       "Bash(git init:*)",
-      "Bash(git add:*)"
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(python -m json.tool:*)",
+      "Bash(\"\\) + venue\n- Priorité aux entrées avec heure définie sur \"NC\"\n- Ajout verbose mode pour logging HTTP des RSS\n- Radius Ticketmaster passé à 180km\n- Mise à jour expo_fondations \\(Beyeler, Schneider, Fernet-Branca, Würth\\)\n- Ajout CITY_DISTANCES dans config.py\n\nCo-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>\nEOF\n\\)\")",
+      "WebFetch(domain:atlasflux.saynete.net)"
     ]
   }
 }

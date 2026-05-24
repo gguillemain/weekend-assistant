@@ -6,6 +6,7 @@ from engine import calendar_engine
 from engine import suggest
 from engine import email_sender
 from engine import profile
+from engine.cache import cache_stats, cache_clear_all, cache_clear_expired
 from collectors import weather, cinema, events, hiking
 from apscheduler.schedulers.background import BackgroundScheduler
 
@@ -291,6 +292,26 @@ def test_email_route():
         """
 
     return html
+
+
+@app.route("/cache-stats")
+def cache_stats_route():
+    """Endpoint pour voir les statistiques du cache."""
+    stats = cache_stats()
+    return jsonify(stats)
+
+
+@app.route("/cache-clear", methods=["DELETE"])
+def cache_clear_route():
+    """Endpoint pour vider le cache."""
+    mode = request.args.get("mode", "all")
+
+    if mode == "expired":
+        count = cache_clear_expired()
+        return jsonify({"cleared": count, "mode": "expired"})
+    else:
+        count = cache_clear_all()
+        return jsonify({"cleared": count, "mode": "all"})
 
 
 def display_weather_forecast(forecast: dict) -> None:
