@@ -227,41 +227,52 @@ def _scrape_fondation_beyeler(verbose: bool = False) -> List[Dict]:
 
         soup = BeautifulSoup(resp.content, "lxml")
 
-        # Chercher les blocs d'exposition
-        # Structure typique: articles ou divs avec titres et dates
-        for article in soup.select("article, .exhibition-item, .expo-card, [class*='exhibition']"):
-            title_el = article.select_one("h2, h3, .title, [class*='title']")
-            date_el = article.select_one(".date, .dates, [class*='date'], time")
-            desc_el = article.select_one("p, .description, .excerpt, [class*='desc']")
-            link_el = article.select_one("a[href*='exposition'], a[href*='exhibition']")
+        # Site Angular/TYPO3 : extraire les expos depuis les liens
+        # Les liens vers /fr/expositions/[nom-expo] contiennent les expos actuelles
+        seen_titles = set()
+        for a in soup.find_all("a", href=True):
+            href = a.get("href", "")
+            text = a.get_text(strip=True)
 
-            if not title_el:
-                continue
+            # Filtrer les liens vers des expositions spécifiques
+            if "/fr/expositions/" in href and href != "/fr/expositions":
+                # Exclure les pages génériques
+                if "precedentes" in href.lower() or "archive" in href.lower():
+                    continue
 
-            title = title_el.get_text(strip=True)
-            dates_text = date_el.get_text(strip=True) if date_el else ""
-            description = desc_el.get_text(strip=True)[:300] if desc_el else ""
-            expo_url = link_el.get("href", "") if link_el else ""
+                # Extraire le nom de l'expo depuis l'URL ou le texte
+                title = text if text and len(text) > 2 else ""
+                if not title:
+                    # Extraire depuis l'URL
+                    parts = href.rstrip("/").split("/")
+                    if parts:
+                        title = parts[-1].replace("-", " ").title()
 
-            if expo_url and not expo_url.startswith("http"):
-                expo_url = f"https://www.fondationbeyeler.ch{expo_url}"
+                if not _is_valid_title(title):
+                    continue
+                if title.lower() in seen_titles:
+                    continue
+                if title.lower() in ["lire plus", "en savoir plus", "expositions", "fr"]:
+                    continue
 
-            date_start, date_end = _extract_dates(dates_text)
+                seen_titles.add(title.lower())
 
-            exhibitions.append({
-                "title": title,
-                "venue": source,
-                "city": city,
-                "distance_km": _get_distance(city),
-                "date_start": date_start,
-                "date_end": date_end,
-                "artists": [],
-                "description": description,
-                "type": "autre",
-                "url": expo_url or url,
-                "profile_match": 0.0,
-                "source": source
-            })
+                expo_url = href if href.startswith("http") else f"https://www.fondationbeyeler.ch{href}"
+
+                exhibitions.append({
+                    "title": title,
+                    "venue": source,
+                    "city": city,
+                    "distance_km": _get_distance(city),
+                    "date_start": None,
+                    "date_end": None,
+                    "artists": [title] if title else [],  # L'artiste est souvent le titre
+                    "description": "",
+                    "type": "expo_solo",
+                    "url": expo_url,
+                    "profile_match": 0.0,
+                    "source": source
+                })
 
     except requests.exceptions.RequestException as e:
         if verbose:
@@ -271,9 +282,9 @@ def _scrape_fondation_beyeler(verbose: bool = False) -> List[Dict]:
 
 
 def _scrape_fondation_schneider(verbose: bool = False) -> List[Dict]:
-    """Scrape Fondation Schneider (Wattwiller)."""
-    url = "https://www.fondationschneider.fr/expositions"
-    source = "Fondation Schneider"
+    """Scrape Fondation François Schneider (Wattwiller)."""
+    url = "https://www.fondationfrancoisschneider.org/expositions/"
+    source = "Fondation François Schneider"
     city = "Wattwiller"
     exhibitions = []
 
@@ -285,85 +296,24 @@ def _scrape_fondation_schneider(verbose: bool = False) -> List[Dict]:
 
         soup = BeautifulSoup(resp.content, "lxml")
 
-        for article in soup.select("article, .expo, .exhibition, [class*='expo']"):
-            title_el = article.select_one("h2, h3, .title")
-            date_el = article.select_one(".date, .dates, [class*='date']")
-            artist_el = article.select_one(".artist, .artiste, [class*='artist']")
-            link_el = article.select_one("a[href]")
+        # Chercher les blocs d'exposition (structure WordPress)
+        for article in soup.select("article, .expo-item, .exhibition-card, [class*='expo'], .wp-block-group"):
+            title_el = article.select_one("h2, h3, h4, .title")
+            date_el = article.select_one(".date, .dates, [class*='date'], time, p")
+            link_el = article.select_one("a[href*='exposition'], a[href*='expo']")
 
             if not title_el:
                 continue
 
             title = title_el.get_text(strip=True)
+            if not _is_valid_title(title):
+                continue
+
             dates_text = date_el.get_text(strip=True) if date_el else ""
-            artist_text = artist_el.get_text(strip=True) if artist_el else ""
             expo_url = link_el.get("href", "") if link_el else ""
 
             if expo_url and not expo_url.startswith("http"):
-                expo_url = f"https://www.fondationschneider.fr{expo_url}"
-
-            date_start, date_end = _extract_dates(dates_text)
-            artists = [a.strip() for a in artist_text.split(",") if a.strip()] if artist_text else []
-
-            exhibitions.append({
-                "title": title,
-                "venue": source,
-                "city": city,
-                "distance_km": _get_distance(city),
-                "date_start": date_start,
-                "date_end": date_end,
-                "artists": artists,
-                "description": "",
-                "type": _detect_expo_type(title, "", artists),
-                "url": expo_url or url,
-                "profile_match": 0.0,
-                "source": source
-            })
-
-    except requests.exceptions.RequestException as e:
-        if verbose:
-            print(f"  {source}: ERREUR — {e}")
-
-    return exhibitions
-
-
-def _scrape_fernet_branca(verbose: bool = False) -> List[Dict]:
-    """Scrape Espace Fernet-Branca (Saint-Louis)."""
-    url = "https://www.fernet-branca.com/agenda"
-    source = "Espace Fernet-Branca"
-    city = "Saint-Louis"
-    exhibitions = []
-
-    try:
-        resp = requests.get(url, headers=HEADERS, timeout=15)
-        if verbose:
-            print(f"  {source}: HTTP {resp.status_code}")
-        resp.raise_for_status()
-
-        soup = BeautifulSoup(resp.content, "lxml")
-
-        for item in soup.select("article, .event, .agenda-item, [class*='event']"):
-            title_el = item.select_one("h2, h3, .title")
-            date_el = item.select_one(".date, [class*='date']")
-            type_el = item.select_one(".type, .category, [class*='type']")
-            link_el = item.select_one("a[href]")
-            desc_el = item.select_one("p, .description")
-
-            if not title_el:
-                continue
-
-            title = title_el.get_text(strip=True)
-            dates_text = date_el.get_text(strip=True) if date_el else ""
-            event_type = type_el.get_text(strip=True).lower() if type_el else ""
-            description = desc_el.get_text(strip=True)[:300] if desc_el else ""
-            expo_url = link_el.get("href", "") if link_el else ""
-
-            # Filtrer : garder expos, ignorer concerts
-            if "concert" in event_type or "musique" in event_type:
-                continue
-
-            if expo_url and not expo_url.startswith("http"):
-                expo_url = f"https://www.fernet-branca.com{expo_url}"
+                expo_url = f"https://www.fondationfrancoisschneider.org{expo_url}"
 
             date_start, date_end = _extract_dates(dates_text)
 
@@ -375,12 +325,121 @@ def _scrape_fernet_branca(verbose: bool = False) -> List[Dict]:
                 "date_start": date_start,
                 "date_end": date_end,
                 "artists": [],
-                "description": description,
+                "description": "",
                 "type": "autre",
                 "url": expo_url or url,
                 "profile_match": 0.0,
                 "source": source
             })
+
+        # Si aucun résultat, chercher dans les liens de la page
+        if not exhibitions:
+            for a in soup.find_all("a", href=True):
+                href = a.get("href", "")
+                text = a.get_text(strip=True)
+                if "/exposition" in href.lower() and text and len(text) > 5:
+                    if _is_valid_title(text) and text not in ["Les expositions", "Expositions"]:
+                        exhibitions.append({
+                            "title": text,
+                            "venue": source,
+                            "city": city,
+                            "distance_km": _get_distance(city),
+                            "date_start": None,
+                            "date_end": None,
+                            "artists": [],
+                            "description": "",
+                            "type": "autre",
+                            "url": href if href.startswith("http") else f"https://www.fondationfrancoisschneider.org{href}",
+                            "profile_match": 0.0,
+                            "source": source
+                        })
+
+    except requests.exceptions.RequestException as e:
+        if verbose:
+            print(f"  {source}: ERREUR — {e}")
+
+    return exhibitions
+
+
+def _scrape_fernet_branca(verbose: bool = False) -> List[Dict]:
+    """Scrape Fondation Fernet-Branca (Saint-Louis)."""
+    url = "https://www.fondationfernet-branca.org/expositions"
+    source = "Fondation Fernet-Branca"
+    city = "Saint-Louis"
+    exhibitions = []
+
+    try:
+        resp = requests.get(url, headers=HEADERS, timeout=15)
+        if verbose:
+            print(f"  {source}: HTTP {resp.status_code}")
+        resp.raise_for_status()
+
+        soup = BeautifulSoup(resp.content, "lxml")
+
+        # Structure du site : h1 "Exposition en cours", h2 titre expo
+        current_section = soup.find("h1", string=lambda t: t and "en cours" in t.lower())
+        if current_section:
+            # Chercher le h2 suivant (titre de l'expo)
+            next_h2 = current_section.find_next("h2")
+            if next_h2:
+                title = next_h2.get_text(strip=True)
+
+                # Chercher les dates dans le texte environnant
+                parent = next_h2.find_parent(["section", "article", "div"])
+                dates_text = ""
+                description = ""
+                if parent:
+                    text = parent.get_text(" ", strip=True)
+                    # Extraire dates
+                    import re
+                    date_match = re.search(r"(\d{1,2}\s+\w+\s+\d{4})\s*[-–à]\s*(\d{1,2}\s+\w+\s+\d{4})", text)
+                    if date_match:
+                        dates_text = f"{date_match.group(1)} - {date_match.group(2)}"
+                    # Description (premiers 300 chars après le titre)
+                    desc_el = parent.find("p")
+                    if desc_el:
+                        description = desc_el.get_text(strip=True)[:300]
+
+                date_start, date_end = _extract_dates(dates_text)
+
+                exhibitions.append({
+                    "title": title,
+                    "venue": source,
+                    "city": city,
+                    "distance_km": _get_distance(city),
+                    "date_start": date_start,
+                    "date_end": date_end,
+                    "artists": [],
+                    "description": description,
+                    "type": "autre",
+                    "url": url,
+                    "profile_match": 0.0,
+                    "source": source
+                })
+
+        # Fallback : chercher les h2 directement
+        if not exhibitions:
+            for h2 in soup.find_all("h2"):
+                title = h2.get_text(strip=True)
+                if title and _is_valid_title(title) and len(title) > 3:
+                    # Ignorer les titres de section
+                    if title.lower() in ["expositions passées", "expositions à venir", "exposition en cours"]:
+                        continue
+                    exhibitions.append({
+                        "title": title,
+                        "venue": source,
+                        "city": city,
+                        "distance_km": _get_distance(city),
+                        "date_start": None,
+                        "date_end": None,
+                        "artists": [],
+                        "description": "",
+                        "type": "autre",
+                        "url": url,
+                        "profile_match": 0.0,
+                        "source": source
+                    })
+                    break  # Prendre seulement la première
 
     except requests.exceptions.RequestException as e:
         if verbose:
@@ -391,7 +450,8 @@ def _scrape_fernet_branca(verbose: bool = False) -> List[Dict]:
 
 def _scrape_musee_wurth(verbose: bool = False) -> List[Dict]:
     """Scrape Musée Würth (Erstein)."""
-    url = "https://www.musee-wurth.fr/expositions"
+    # La page /expositions ne liste pas les expos, on récupère depuis le menu
+    url = "https://www.musee-wurth.fr/"
     source = "Musée Würth"
     city = "Erstein"
     exhibitions = []
@@ -404,40 +464,50 @@ def _scrape_musee_wurth(verbose: bool = False) -> List[Dict]:
 
         soup = BeautifulSoup(resp.content, "lxml")
 
-        for item in soup.select("article, .expo, [class*='exhibition'], [class*='expo']"):
-            title_el = item.select_one("h2, h3, .title")
-            date_el = item.select_one(".date, [class*='date']")
-            artist_el = item.select_one(".artist, [class*='artist']")
-            link_el = item.select_one("a[href]")
+        # Chercher le lien vers l'expo en cours dans le menu
+        # Structure: menu avec lien EXPOSITIONS qui pointe vers l'expo actuelle
+        for a in soup.find_all("a", href=True):
+            href = a.get("href", "")
+            text = a.get_text(strip=True)
 
-            if not title_el:
-                continue
+            # Le menu "EXPOSITIONS" pointe vers l'expo en cours
+            if text.upper() == "EXPOSITIONS" and "musee-wurth.fr" in href:
+                expo_url = href
+                # Suivre le lien pour obtenir le titre
+                try:
+                    resp2 = requests.get(expo_url, headers=HEADERS, timeout=10)
+                    soup2 = BeautifulSoup(resp2.content, "lxml")
+                    title_el = soup2.find("h1")
+                    title = title_el.get_text(strip=True) if title_el else ""
 
-            title = title_el.get_text(strip=True)
-            dates_text = date_el.get_text(strip=True) if date_el else ""
-            artist_text = artist_el.get_text(strip=True) if artist_el else ""
-            expo_url = link_el.get("href", "") if link_el else ""
+                    if title and _is_valid_title(title):
+                        # Chercher les dates dans la page
+                        text_content = soup2.get_text()
+                        import re
+                        date_match = re.search(
+                            r"(\d{1,2}\s+\w+\s+\d{4})\s*[-–àau]+\s*(\d{1,2}\s+\w+\s+\d{4})",
+                            text_content
+                        )
+                        dates_text = f"{date_match.group(1)} - {date_match.group(2)}" if date_match else ""
+                        date_start, date_end = _extract_dates(dates_text)
 
-            if expo_url and not expo_url.startswith("http"):
-                expo_url = f"https://www.musee-wurth.fr{expo_url}"
-
-            date_start, date_end = _extract_dates(dates_text)
-            artists = [a.strip() for a in artist_text.split(",") if a.strip()] if artist_text else []
-
-            exhibitions.append({
-                "title": title,
-                "venue": source,
-                "city": city,
-                "distance_km": _get_distance(city),
-                "date_start": date_start,
-                "date_end": date_end,
-                "artists": artists,
-                "description": "",
-                "type": _detect_expo_type(title, "", artists),
-                "url": expo_url or url,
-                "profile_match": 0.0,
-                "source": source
-            })
+                        exhibitions.append({
+                            "title": title,
+                            "venue": source,
+                            "city": city,
+                            "distance_km": _get_distance(city),
+                            "date_start": date_start,
+                            "date_end": date_end,
+                            "artists": [],
+                            "description": "",
+                            "type": "expo_collective",
+                            "url": expo_url,
+                            "profile_match": 0.0,
+                            "source": source
+                        })
+                except Exception:
+                    pass
+                break
 
     except requests.exceptions.RequestException as e:
         if verbose:
@@ -519,35 +589,38 @@ def _scrape_kunstmuseum_basel(verbose: bool = False) -> List[Dict]:
 
         soup = BeautifulSoup(resp.content, "lxml")
 
-        for item in soup.select("article, .exhibition, [class*='exhibition'], [class*='expo']"):
-            title_el = item.select_one("h2, h3, .title")
-            date_el = item.select_one(".date, [class*='date']")
-            desc_el = item.select_one("p, .description, .lead")
-            link_el = item.select_one("a[href]")
+        # Structure du site : les h2 contiennent les titres d'expo
+        # Ignorer les h2 de section ("Expositions spéciales", "Expositions", etc.)
+        section_titles = ["expositions spéciales", "expositions", "espaces focaux", "projets"]
 
-            if not title_el:
+        for h2 in soup.find_all("h2"):
+            title = h2.get_text(strip=True)
+
+            if not _is_valid_title(title):
+                continue
+            if title.lower() in section_titles:
+                continue
+            if "&" in title and len(title) < 5:  # "de &" type links
                 continue
 
-            title = title_el.get_text(strip=True)
-            dates_text = date_el.get_text(strip=True) if date_el else ""
-            description = desc_el.get_text(strip=True)[:300] if desc_el else ""
-            expo_url = link_el.get("href", "") if link_el else ""
-
-            if expo_url and not expo_url.startswith("http"):
-                expo_url = f"https://www.kunstmuseumbasel.ch{expo_url}"
-
-            date_start, date_end = _extract_dates(dates_text)
+            # Chercher un lien parent ou enfant
+            link_el = h2.find_parent("a") or h2.find("a") or h2.find_next("a")
+            expo_url = ""
+            if link_el and link_el.get("href"):
+                href = link_el.get("href")
+                if "exposition" in href or "ausstellung" in href:
+                    expo_url = href if href.startswith("http") else f"https://www.kunstmuseumbasel.ch{href}"
 
             exhibitions.append({
                 "title": title,
                 "venue": source,
                 "city": city,
                 "distance_km": _get_distance(city),
-                "date_start": date_start,
-                "date_end": date_end,
-                "artists": [],
-                "description": description,
-                "type": "autre",
+                "date_start": None,
+                "date_end": None,
+                "artists": [title],  # Le titre est souvent l'artiste
+                "description": "",
+                "type": "expo_solo",
                 "url": expo_url or url,
                 "profile_match": 0.0,
                 "source": source
@@ -572,9 +645,16 @@ def _is_valid_title(title: str) -> bool:
     if "{{" in title or "}}" in title:
         return False
     # Exclure les titres génériques
-    generic = ["en savoir plus", "lire la suite", "voir plus", "expositions"]
-    if title.lower().strip() in generic:
-        return False
+    title_lower = title.lower().strip()
+    generic = [
+        "en savoir plus", "lire la suite", "voir plus", "expositions",
+        "expositions en cours", "expositions passées", "expositions à venir",
+        "exposition en cours", "découvrez toutes nos expositions",
+        "découvrez toutes nos expositions passées", "les expositions"
+    ]
+    for g in generic:
+        if title_lower == g or title_lower.startswith(g):
+            return False
     return True
 
 
