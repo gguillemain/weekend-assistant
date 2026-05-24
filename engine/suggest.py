@@ -4,7 +4,7 @@ from datetime import datetime
 from typing import Dict, List
 
 from engine import calendar_engine, profile
-from collectors import weather, cinema, events, hiking, travel, concerts
+from collectors import weather, cinema, events, hiking, travel, concerts, exhibitions
 
 
 BASE_SYSTEM_PROMPT = """Tu es un assistant personnel de loisirs pour un couple
@@ -17,6 +17,10 @@ les voyages et les concerts. Leur rayon d'action habituel est 300km.
 Pour les concerts, mets en avant ceux dont le profile_match est > 0.3.
 Si un artiste correspond exactement aux artistes favoris du profil,
 signale-le explicitement dans ta suggestion.
+
+Si une exposition correspond à un artiste favori du profil
+(Soulages, Banksy, surréalistes), mets-la en avant comme
+suggestion prioritaire avec une description enthousiaste.
 Tu proposes des idées concrètes, bien argumentées,
 adaptées à la météo et aux événements réels fournis.
 Tu n'inventes rien : tu t'appuies uniquement sur les
@@ -253,7 +257,7 @@ Mélange city breaks proches et destinations plus lointaines si la durée le per
 {request}"""
 
 
-def _build_user_prompt(period: Dict, weather_data: Dict, movies: List[Dict], events_list: List[Dict], hikes: List[Dict], concerts_list: List[Dict] = None) -> str:
+def _build_user_prompt(period: Dict, weather_data: Dict, movies: List[Dict], events_list: List[Dict], hikes: List[Dict], concerts_list: List[Dict] = None, exhibitions_list: List[Dict] = None) -> str:
     """Construit le prompt utilisateur complet."""
     period_info = f"""Période : {period['label']}
 Dates : du {period['start'].strftime('%d/%m/%Y')} au {period['end'].strftime('%d/%m/%Y')}
@@ -265,6 +269,7 @@ Mode : {period['mode']}"""
     events_context = _format_events_context(events_list)
     hiking_context = _format_hiking_context(hikes)
     concerts_context = concerts.format_concerts_context(concerts_list) if concerts_list else ""
+    exhibitions_context = exhibitions.format_exhibitions_context(exhibitions_list) if exhibitions_list else ""
 
     request = """Propose 3 à 5 suggestions pour cette période.
 
@@ -286,9 +291,9 @@ Réponds UNIQUEMENT en JSON valide avec ce format exact :
 Valeurs possibles :
 - day : "Samedi", "Dimanche", "Lundi", "Flexible"
 - logistics : "Spontané", "À réserver", "À planifier"
-- type : "cinema", "rando", "culture", "gastronomie", "concert", "autre"
+- type : "cinema", "rando", "culture", "exposition", "gastronomie", "concert", "autre"
 
-Privilégie la variété : mélange cinéma, randonnée, culture, concert, gastronomie si possible."""
+Privilégie la variété : mélange cinéma, randonnée, exposition, concert, gastronomie si possible."""
 
     return f"""{period_info}
 
@@ -301,6 +306,8 @@ Privilégie la variété : mélange cinéma, randonnée, culture, concert, gastr
 {hiking_context}
 
 {concerts_context}
+
+{exhibitions_context}
 
 {request}"""
 
@@ -327,6 +334,7 @@ def generate_suggestions(period: Dict) -> Dict:
         events_list = []
         hikes = []
         concerts_list = []
+        exhibitions_list = []
     else:
         # Mode week-end : suggestions locales
         user_profile = profile.get_profile()
@@ -335,7 +343,8 @@ def generate_suggestions(period: Dict) -> Dict:
         events_list = events.get_local_events(period)
         hikes = hiking.get_hiking_suggestions(period, weather_data)
         concerts_list = concerts.get_concerts(period, user_profile)
-        user_prompt = _build_user_prompt(period, weather_data, movies, events_list, hikes, concerts_list)
+        exhibitions_list = exhibitions.get_exhibitions(period, user_profile)
+        user_prompt = _build_user_prompt(period, weather_data, movies, events_list, hikes, concerts_list, exhibitions_list)
         system_prompt = BASE_SYSTEM_PROMPT.format(profile_section=profile_section)
         travel_data = {}
 
@@ -386,6 +395,7 @@ def generate_suggestions(period: Dict) -> Dict:
         "events": events_list[:8] if events_list else [],
         "hikes": hikes[:3] if hikes else [],
         "concerts": concerts_list[:5] if concerts_list else [],
+        "exhibitions": exhibitions_list[:4] if exhibitions_list else [],
         "travel": travel_data if is_vacation else {},
         "is_vacation": is_vacation,
         "suggestions": suggestions,
