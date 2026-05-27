@@ -906,7 +906,7 @@
 
                     buttons.forEach(function(b) { b.disabled = true; });
 
-                    fetch('/feedback', {
+                    fetch('feedback', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({
@@ -1076,7 +1076,7 @@
                 data.period_end = periodEnd;
                 data.period_label = periodLabel;
 
-                fetch('/activity', {
+                fetch('activity', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(data)
@@ -1119,7 +1119,7 @@
         function loadHistory() {
             if (historyLoaded) return;
 
-            fetch('/profile?mode=full')
+            fetch('profile?mode=full')
                 .then(function(response) { return response.json(); })
                 .then(function(data) {
                     historyLoaded = true;
