@@ -689,7 +689,24 @@ def format_discovery_context(events: List[Dict]) -> str:
     lines = ["Bons plans / Découvertes :"]
 
     for event in top_events:
-        date_str = event["date_start"].strftime("%d/%m") if event["date_start"] else "Date NC"
+        # Gérer date_start qui peut être date, str (depuis cache JSON) ou None
+        date_start = event["date_start"]
+        if date_start:
+            if isinstance(date_start, str):
+                # String depuis cache JSON (format ISO "YYYY-MM-DD")
+                try:
+                    date_obj = datetime.strptime(date_start, "%Y-%m-%d").date()
+                    date_str = date_obj.strftime("%d/%m")
+                except ValueError:
+                    date_str = "Date NC"
+            elif isinstance(date_start, date):
+                # Objet date Python
+                date_str = date_start.strftime("%d/%m")
+            else:
+                date_str = "Date NC"
+        else:
+            date_str = "Date NC"
+
         price_str = f" | {event['price']}" if event["price"] != "NC" else ""
 
         lines.append(f"- [{event['category'].upper()}] {event['title']}")
@@ -733,7 +750,21 @@ def display_discovery(events: List[Dict]) -> None:
     print(f"{'—'*50}")
 
     for i, event in enumerate(events[:3], 1):
-        date_str = event["date_start"].strftime("%d/%m/%Y") if event["date_start"] else "Date NC"
+        # Gérer date_start qui peut être date, str (depuis cache JSON) ou None
+        date_start = event["date_start"]
+        if date_start:
+            if isinstance(date_start, str):
+                try:
+                    date_obj = datetime.strptime(date_start, "%Y-%m-%d").date()
+                    date_str = date_obj.strftime("%d/%m/%Y")
+                except ValueError:
+                    date_str = "Date NC"
+            elif isinstance(date_start, date):
+                date_str = date_start.strftime("%d/%m/%Y")
+            else:
+                date_str = "Date NC"
+        else:
+            date_str = "Date NC"
 
         print(f"\n{i}. [{event['category'].upper()}] {event['title']}")
         print(f"   Lieu : {event['city']} ({event['distance_km']:.0f}km)")
