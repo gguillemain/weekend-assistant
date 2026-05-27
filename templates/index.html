@@ -403,6 +403,23 @@
             cursor: wait;
         }
 
+        .feedback-btn.done {
+            background: #F5F5F5;
+            font-size: 1.1rem;
+            font-weight: bold;
+        }
+
+        .feedback-btn.done:hover {
+            background: var(--sage);
+            color: white;
+        }
+
+        .feedback-btn.done.selected {
+            background: var(--sage);
+            color: white;
+            cursor: default;
+        }
+
         /* Film cards */
         .films-grid {
             display: grid;
@@ -713,6 +730,7 @@
                     <div class="feedback-buttons">
                         <button class="feedback-btn like" data-rating="1" title="J'aime">👍</button>
                         <button class="feedback-btn dislike" data-rating="-1" title="Pas pour moi">👎</button>
+                        <button class="feedback-btn done" title="Déjà fait">✓</button>
                     </div>
                 </article>
                 {% endfor %}
@@ -896,13 +914,13 @@
             var periodLabel = "{{ period.label if period else '' }}";
 
             // Boutons feedback 👍/👎
-            document.querySelectorAll('.feedback-btn').forEach(function(btn) {
+            document.querySelectorAll('.feedback-btn.like, .feedback-btn.dislike').forEach(function(btn) {
                 btn.addEventListener('click', function() {
                     var card = this.closest('.suggestion-card');
                     var title = card.dataset.title;
                     var suggestionType = card.dataset.suggestionType;
                     var rating = parseInt(this.dataset.rating);
-                    var buttons = card.querySelectorAll('.feedback-btn');
+                    var buttons = card.querySelectorAll('.feedback-btn.like, .feedback-btn.dislike');
 
                     buttons.forEach(function(b) { b.disabled = true; });
 
@@ -933,6 +951,49 @@
                     })
                     .finally(function() {
                         buttons.forEach(function(b) { b.disabled = false; });
+                    });
+                });
+            });
+
+            // Boutons "Déjà fait"
+            document.querySelectorAll('.feedback-btn.done').forEach(function(button) {
+                button.addEventListener('click', function() {
+                    if (this.classList.contains('selected')) return;
+
+                    var card = this.closest('.suggestion-card');
+                    var title = card.dataset.title;
+                    var type = card.dataset.suggestionType;
+
+                    // Marquer visuellement
+                    this.classList.add('selected');
+                    this.textContent = '✓ Marqué';
+                    this.disabled = true;
+
+                    // Envoyer à l'API
+                    fetch('mark-as-done', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            title: title,
+                            type: type,
+                            date: new Date().toISOString().split('T')[0]
+                        })
+                    })
+                    .then(function(response) { return response.json(); })
+                    .then(function(result) {
+                        if (!result.ok) {
+                            // Erreur : réinitialiser
+                            button.classList.remove('selected');
+                            button.textContent = '✓';
+                            button.disabled = false;
+                            alert('Erreur : ' + (result.error || 'Impossible de marquer'));
+                        }
+                    })
+                    .catch(function(err) {
+                        console.error('Erreur mark-as-done:', err);
+                        button.classList.remove('selected');
+                        button.textContent = '✓';
+                        button.disabled = false;
                     });
                 });
             });
@@ -1185,6 +1246,18 @@
                         html += '  <ul class="history-details-list">';
                         activity.expos_seen.forEach(function(expo) {
                             html += '<li>' + escapeHtml(expo) + '</li>';
+                        });
+                        html += '  </ul>';
+                        html += '</div>';
+                    }
+
+                    // Randos
+                    if (activity.hiking_seen && activity.hiking_seen.length > 0) {
+                        html += '<div class="history-details">';
+                        html += '  <strong>🥾 Randos :</strong>';
+                        html += '  <ul class="history-details-list">';
+                        activity.hiking_seen.forEach(function(hike) {
+                            html += '<li>' + escapeHtml(hike) + '</li>';
                         });
                         html += '  </ul>';
                         html += '</div>';

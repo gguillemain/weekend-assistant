@@ -366,6 +366,22 @@ def get_hiking_suggestions(period: Dict, weather_data: Optional[Dict] = None) ->
     for hike in hikes:
         hike["weather_score"] = _calculate_weather_score(hike, best_weather_day)
 
+    # Déduplication : filtrer les randonnées déjà faites (90 jours)
+    from engine.profile import get_seen_items_normalized, normalize_for_matching
+
+    seen_hikes = get_seen_items_normalized('hiking', days=90)
+
+    deduplicated = []
+    for hike in hikes:
+        hike_normalized = normalize_for_matching(hike["title"])
+
+        if hike_normalized not in seen_hikes:
+            deduplicated.append(hike)
+        else:
+            print(f"  [SKIP] Rando déjà faite : {hike['title']}")
+
+    hikes = deduplicated
+
     # Trier par score combiné (note + weather_score + bonus boucle)
     def sort_key(h):
         score = (h.get("rating", 0) or 0) * 0.4

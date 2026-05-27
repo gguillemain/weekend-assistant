@@ -24,13 +24,13 @@ def scheduled_email_job():
         print(f"[Scheduler] Email: {result['message']}")
 
 
-# Planifier l'envoi chaque mercredi à 18h
+# Planifier l'envoi chaque mercredi à 11h30
 scheduler.add_job(
     func=scheduled_email_job,
     trigger="cron",
     day_of_week="wed",
-    hour=18,
-    minute=0,
+    hour=11,
+    minute=30,
     id="weekly_email",
     replace_existing=True
 )
@@ -205,6 +205,7 @@ def activity_route():
     films_seen = data.get("films_seen")
     concerts_seen = data.get("concerts_seen")
     expos_seen = data.get("expos_seen")
+    hiking_seen = data.get("hiking_seen")
     stayed_home_reason = data.get("stayed_home_reason")
 
     if not category:
@@ -220,10 +221,71 @@ def activity_route():
         films_seen=films_seen,
         concerts_seen=concerts_seen,
         expos_seen=expos_seen,
+        hiking_seen=hiking_seen,
         stayed_home_reason=stayed_home_reason
     )
 
     return jsonify({"ok": True})
+
+
+@app.route("/mark-as-done", methods=["POST"])
+def mark_as_done_route():
+    """Marque une suggestion comme déjà faite."""
+    data = request.get_json()
+
+    if not data:
+        return jsonify({"error": "Aucune donnée fournie"}), 400
+
+    title = data.get("title")
+    suggestion_type = data.get("type")
+    done_date = data.get("date")  # Format ISO "2026-05-27"
+
+    if not title or not suggestion_type:
+        return jsonify({"error": "title et type requis"}), 400
+
+    # Date par défaut = aujourd'hui
+    if not done_date:
+        from datetime import date
+        done_date = date.today().isoformat()
+
+    # Formater selon le type
+    if suggestion_type == "cinema":
+        item = title  # Simple titre
+        field = "films_seen"
+    elif suggestion_type == "concert":
+        item = title  # Format "Artiste - Lieu" déjà présent
+        field = "concerts_seen"
+    elif suggestion_type == "expo":
+        item = title  # Format "Expo - Lieu" déjà présent
+        field = "expos_seen"
+    elif suggestion_type == "rando":
+        # Format : "Nom rando (DD/MM/YYYY)"
+        from datetime import datetime
+        date_obj = datetime.strptime(done_date, "%Y-%m-%d")
+        formatted_date = date_obj.strftime("%d/%m/%Y")
+        item = f"{title} ({formatted_date})"
+        field = "hiking_seen"
+    else:
+        return jsonify({"error": f"Type '{suggestion_type}' non supporté"}), 400
+
+    # Créer une activité avec juste cet item
+    from datetime import datetime
+    date_obj = datetime.strptime(done_date, "%Y-%m-%d")
+    period = {
+        "start": done_date,
+        "end": done_date,
+        "label": f"Marqué le {date_obj.strftime('%d/%m/%Y')}"
+    }
+
+    kwargs = {
+        "period": period,
+        "category": "sortie_locale",
+        field: [item]
+    }
+
+    profile.log_activity(**kwargs)
+
+    return jsonify({"ok": True, "message": f"{title} marqué comme fait"})
 
 
 @app.route("/send-email")
