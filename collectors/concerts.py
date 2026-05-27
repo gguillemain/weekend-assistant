@@ -424,7 +424,22 @@ def format_concerts_context(concerts: List[Dict]) -> str:
     lines = ["Concerts à venir sur la période :"]
 
     for concert in top_concerts:
-        date_str = concert["date"].strftime("%d/%m") if concert["date"] else "Date NC"
+        # Gérer date qui peut être date, str (depuis cache JSON) ou None
+        concert_date = concert["date"]
+        if concert_date:
+            if isinstance(concert_date, str):
+                try:
+                    date_obj = datetime.strptime(concert_date, "%Y-%m-%d").date()
+                    date_str = date_obj.strftime("%d/%m")
+                except ValueError:
+                    date_str = "Date NC"
+            elif isinstance(concert_date, date):
+                date_str = concert_date.strftime("%d/%m")
+            else:
+                date_str = "Date NC"
+        else:
+            date_str = "Date NC"
+
         price_str = ""
         if concert["price_min"]:
             price_str = f" | à partir de {concert['price_min']:.0f}€"
@@ -463,7 +478,22 @@ def display_concerts(concerts: List[Dict]) -> None:
     print(f"{'—'*50}")
 
     for i, concert in enumerate(concerts[:5], 1):
-        date_str = concert["date"].strftime("%d/%m/%Y") if concert["date"] else "Date NC"
+        # Gérer date qui peut être date, str (depuis cache JSON) ou None
+        concert_date = concert["date"]
+        if concert_date:
+            if isinstance(concert_date, str):
+                try:
+                    date_obj = datetime.strptime(concert_date, "%Y-%m-%d").date()
+                    date_str = date_obj.strftime("%d/%m/%Y")
+                except ValueError:
+                    date_str = "Date NC"
+            elif isinstance(concert_date, date):
+                date_str = concert_date.strftime("%d/%m/%Y")
+            else:
+                date_str = "Date NC"
+        else:
+            date_str = "Date NC"
+
         print(f"\n{i}. {concert['artist']}")
         print(f"   Salle : {concert['venue']} ({concert['city']})")
         print(f"   Date : {date_str} à {concert['time']}")

@@ -798,8 +798,39 @@ def format_exhibitions_context(exhibitions: List[Dict]) -> str:
     lines = ["Expositions en cours :"]
 
     for expo in top_expos:
-        date_start_str = expo["date_start"].strftime("%d/%m") if expo["date_start"] else "?"
-        date_end_str = expo["date_end"].strftime("%d/%m/%Y") if expo["date_end"] else "?"
+        # Gérer date_start qui peut être date, str (depuis cache JSON) ou None
+        date_start = expo["date_start"]
+        if date_start:
+            if isinstance(date_start, str):
+                try:
+                    from datetime import datetime, date
+                    date_obj = datetime.strptime(date_start, "%Y-%m-%d").date()
+                    date_start_str = date_obj.strftime("%d/%m")
+                except ValueError:
+                    date_start_str = "?"
+            elif isinstance(date_start, date):
+                date_start_str = date_start.strftime("%d/%m")
+            else:
+                date_start_str = "?"
+        else:
+            date_start_str = "?"
+
+        # Gérer date_end de la même manière
+        date_end = expo["date_end"]
+        if date_end:
+            if isinstance(date_end, str):
+                try:
+                    from datetime import datetime, date
+                    date_obj = datetime.strptime(date_end, "%Y-%m-%d").date()
+                    date_end_str = date_obj.strftime("%d/%m/%Y")
+                except ValueError:
+                    date_end_str = "?"
+            elif isinstance(date_end, date):
+                date_end_str = date_end.strftime("%d/%m/%Y")
+            else:
+                date_end_str = "?"
+        else:
+            date_end_str = "?"
 
         lines.append(f"- {expo['title']} — {expo['venue']} ({expo['city']}, {expo['distance_km']:.0f}km)")
         lines.append(f"  Du {date_start_str} au {date_end_str}")
@@ -836,8 +867,39 @@ def display_exhibitions(exhibitions: List[Dict]) -> None:
     print(f"{'—'*50}")
 
     for i, expo in enumerate(exhibitions[:3], 1):
-        date_start_str = expo["date_start"].strftime("%d/%m/%Y") if expo["date_start"] else "NC"
-        date_end_str = expo["date_end"].strftime("%d/%m/%Y") if expo["date_end"] else "NC"
+        # Gérer date_start qui peut être date, str (depuis cache JSON) ou None
+        date_start = expo["date_start"]
+        if date_start:
+            if isinstance(date_start, str):
+                try:
+                    from datetime import datetime, date
+                    date_obj = datetime.strptime(date_start, "%Y-%m-%d").date()
+                    date_start_str = date_obj.strftime("%d/%m/%Y")
+                except ValueError:
+                    date_start_str = "NC"
+            elif isinstance(date_start, date):
+                date_start_str = date_start.strftime("%d/%m/%Y")
+            else:
+                date_start_str = "NC"
+        else:
+            date_start_str = "NC"
+
+        # Gérer date_end de la même manière
+        date_end = expo["date_end"]
+        if date_end:
+            if isinstance(date_end, str):
+                try:
+                    from datetime import datetime, date
+                    date_obj = datetime.strptime(date_end, "%Y-%m-%d").date()
+                    date_end_str = date_obj.strftime("%d/%m/%Y")
+                except ValueError:
+                    date_end_str = "NC"
+            elif isinstance(date_end, date):
+                date_end_str = date_end.strftime("%d/%m/%Y")
+            else:
+                date_end_str = "NC"
+        else:
+            date_end_str = "NC"
 
         print(f"\n{i}. {expo['title']}")
         print(f"   Lieu : {expo['venue']} ({expo['city']})")

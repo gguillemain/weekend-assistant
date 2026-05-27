@@ -282,7 +282,23 @@ def format_openagenda_context(events: List[Dict]) -> str:
     lines = ["Événements OpenAgenda :"]
 
     for event in top_events:
-        date_str = event["date_start"].strftime("%d/%m") if event["date_start"] else "Date NC"
+        # Gérer date_start qui peut être date, str (depuis cache JSON) ou None
+        date_start = event["date_start"]
+        if date_start:
+            if isinstance(date_start, str):
+                try:
+                    from datetime import datetime, date
+                    date_obj = datetime.strptime(date_start, "%Y-%m-%d").date()
+                    date_str = date_obj.strftime("%d/%m")
+                except ValueError:
+                    date_str = "Date NC"
+            elif isinstance(date_start, date):
+                date_str = date_start.strftime("%d/%m")
+            else:
+                date_str = "Date NC"
+        else:
+            date_str = "Date NC"
+
         price_str = f" | {event['price']}" if event["price"] != "NC" else ""
 
         lines.append(f"- [{event['category'].upper()}] {event['title']}")
