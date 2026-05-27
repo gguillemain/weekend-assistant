@@ -955,6 +955,39 @@
                 });
             });
 
+            // === Gestion "Déjà fait" avec persistance localStorage ===
+            var DONE_STORAGE_KEY = 'weekend_done_items';
+
+            function getDoneItems() {
+                try {
+                    return JSON.parse(localStorage.getItem(DONE_STORAGE_KEY) || '{}');
+                } catch (e) { return {}; }
+            }
+
+            function saveDoneItem(title, type) {
+                var done = getDoneItems();
+                done[title] = { type: type, date: new Date().toISOString().split('T')[0] };
+                localStorage.setItem(DONE_STORAGE_KEY, JSON.stringify(done));
+            }
+
+            function markButtonAsDone(button) {
+                button.classList.add('selected');
+                button.textContent = '✓ Fait';
+                button.disabled = true;
+            }
+
+            // Restaurer l'état des boutons au chargement
+            function restoreDoneButtons() {
+                var done = getDoneItems();
+                document.querySelectorAll('.suggestion-card').forEach(function(card) {
+                    var title = card.dataset.title;
+                    if (done[title]) {
+                        var btn = card.querySelector('.feedback-btn.done');
+                        if (btn) markButtonAsDone(btn);
+                    }
+                });
+            }
+
             // Boutons "Déjà fait"
             document.querySelectorAll('.feedback-btn.done').forEach(function(button) {
                 button.addEventListener('click', function() {
@@ -963,11 +996,10 @@
                     var card = this.closest('.suggestion-card');
                     var title = card.dataset.title;
                     var type = card.dataset.suggestionType;
+                    var btn = this;
 
-                    // Marquer visuellement
-                    this.classList.add('selected');
-                    this.textContent = '✓ Marqué';
-                    this.disabled = true;
+                    // Marquer visuellement immédiatement
+                    markButtonAsDone(btn);
 
                     // Envoyer à l'API
                     fetch('mark-as-done', {
@@ -981,22 +1013,28 @@
                     })
                     .then(function(response) { return response.json(); })
                     .then(function(result) {
-                        if (!result.ok) {
+                        if (result.ok) {
+                            // Sauvegarder dans localStorage
+                            saveDoneItem(title, type);
+                        } else {
                             // Erreur : réinitialiser
-                            button.classList.remove('selected');
-                            button.textContent = '✓';
-                            button.disabled = false;
+                            btn.classList.remove('selected');
+                            btn.textContent = '✓';
+                            btn.disabled = false;
                             alert('Erreur : ' + (result.error || 'Impossible de marquer'));
                         }
                     })
                     .catch(function(err) {
                         console.error('Erreur mark-as-done:', err);
-                        button.classList.remove('selected');
-                        button.textContent = '✓';
-                        button.disabled = false;
+                        btn.classList.remove('selected');
+                        btn.textContent = '✓';
+                        btn.disabled = false;
                     });
                 });
             });
+
+            // Restaurer au chargement
+            restoreDoneButtons();
 
             // === Widget journal d'activité - Formulaire progressif ===
             var activityState = {
@@ -1181,14 +1219,18 @@
             if (historyLoaded) return;
 
             fetch('profile?mode=full')
-                .then(function(response) { return response.json(); })
+                .then(function(response) {
+                    if (!response.ok) throw new Error('HTTP ' + response.status);
+                    return response.json();
+                })
                 .then(function(data) {
                     historyLoaded = true;
                     renderHistory(data.activities);
                 })
                 .catch(function(err) {
+                    console.error('Erreur chargement historique:', err);
                     document.getElementById('history-timeline').innerHTML =
-                        '<div class="no-history">Erreur de chargement</div>';
+                        '<div class="no-history">Erreur de chargement: ' + err.message + '</div>';
                 });
         }
 
