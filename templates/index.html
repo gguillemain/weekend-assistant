@@ -543,6 +543,109 @@
                 font-size: 1.1rem;
             }
         }
+
+        /* Tabs System */
+        .tabs {
+            display: flex;
+            gap: 0;
+            margin-bottom: 2rem;
+            border-bottom: 2px solid var(--gray-light);
+        }
+
+        .tab-button {
+            background: transparent;
+            border: none;
+            padding: 1rem 2rem;
+            font-size: 1rem;
+            font-weight: 500;
+            color: var(--gray);
+            cursor: pointer;
+            border-bottom: 3px solid transparent;
+            transition: all 0.2s;
+            position: relative;
+            bottom: -2px;
+        }
+
+        .tab-button.active {
+            color: var(--sage);
+            border-bottom-color: var(--sage);
+        }
+
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        /* History Timeline */
+        .history-timeline {
+            display: flex;
+            flex-direction: column;
+            gap: 2rem;
+        }
+
+        .history-month-title {
+            font-size: 1.2rem;
+            font-weight: 600;
+            color: var(--sage);
+            margin-bottom: 1rem;
+            padding-bottom: 0.5rem;
+            border-bottom: 1px solid var(--gray-light);
+        }
+
+        .history-card {
+            background: var(--white);
+            border-radius: 12px;
+            padding: 1.25rem;
+            margin-bottom: 1rem;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.05);
+            border-left: 4px solid var(--gray-light);
+        }
+
+        .history-card.category-sortie_locale {
+            border-left-color: var(--sage);
+        }
+
+        .history-card-header {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 0.75rem;
+        }
+
+        .history-card-title {
+            font-size: 1.05rem;
+            font-weight: 600;
+        }
+
+        .history-details {
+            margin-top: 0.75rem;
+            font-size: 0.9rem;
+        }
+
+        .history-details-list {
+            margin: 0.25rem 0 0 1rem;
+        }
+
+        .history-details-list li {
+            list-style: none;
+            padding-left: 1rem;
+            position: relative;
+        }
+
+        .history-details-list li:before {
+            content: "•";
+            position: absolute;
+            left: 0;
+            color: var(--sage);
+        }
+
+        .no-history {
+            text-align: center;
+            padding: 2rem;
+            color: var(--gray);
+        }
     </style>
 </head>
 <body{% if is_vacation %} class="vacation-mode"{% endif %}>
@@ -566,12 +669,20 @@
     </header>
 
     <main class="container">
-        <!-- Suggestions Claude -->
-        {% if is_vacation %}
-        <h2 class="section-title">Idées de voyage pour ces vacances</h2>
-        {% else %}
-        <h2 class="section-title">Suggestions pour ce week-end</h2>
-        {% endif %}
+        <!-- Tabs Navigation -->
+        <div class="tabs">
+            <button class="tab-button active" data-tab="suggestions">Suggestions</button>
+            <button class="tab-button" data-tab="history">Historique</button>
+        </div>
+
+        <!-- Tab Content: Suggestions -->
+        <div class="tab-content active" id="tab-suggestions">
+            <!-- Suggestions Claude -->
+            {% if is_vacation %}
+            <h2 class="section-title">Idées de voyage pour ces vacances</h2>
+            {% else %}
+            <h2 class="section-title">Suggestions pour ce week-end</h2>
+            {% endif %}
 
         {% if intro %}
         <p class="intro-text">{{ intro }}</p>
@@ -761,6 +872,15 @@
                 ✓ Week-end enregistré
             </div>
         </section>
+        </div>
+
+        <!-- Tab Content: History -->
+        <div class="tab-content" id="tab-history">
+            <h2 class="section-title">Historique de vos activités</h2>
+            <div class="history-timeline" id="history-timeline">
+                <div class="no-history">Chargement...</div>
+            </div>
+        </div>
     </main>
 
     <footer>
@@ -972,6 +1092,130 @@
                 });
             }
         });
+
+        // === Système d'onglets ===
+        var tabs = document.querySelectorAll('.tab-button');
+        var tabContents = document.querySelectorAll('.tab-content');
+
+        tabs.forEach(function(tab) {
+            tab.addEventListener('click', function() {
+                var targetTab = this.dataset.tab;
+
+                tabs.forEach(function(t) { t.classList.remove('active'); });
+                tabContents.forEach(function(tc) { tc.classList.remove('active'); });
+
+                this.classList.add('active');
+                document.getElementById('tab-' + targetTab).classList.add('active');
+
+                if (targetTab === 'history') {
+                    loadHistory();
+                }
+            });
+        });
+
+        // === Chargement historique ===
+        var historyLoaded = false;
+
+        function loadHistory() {
+            if (historyLoaded) return;
+
+            fetch('/profile?mode=full')
+                .then(function(response) { return response.json(); })
+                .then(function(data) {
+                    historyLoaded = true;
+                    renderHistory(data.activities);
+                })
+                .catch(function(err) {
+                    document.getElementById('history-timeline').innerHTML =
+                        '<div class="no-history">Erreur de chargement</div>';
+                });
+        }
+
+        function renderHistory(historyData) {
+            var timeline = document.getElementById('history-timeline');
+
+            if (!historyData || !historyData.grouped || historyData.grouped.length === 0) {
+                timeline.innerHTML = '<div class="no-history">Aucune activité enregistrée</div>';
+                return;
+            }
+
+            var html = '';
+
+            historyData.grouped.forEach(function(month) {
+                html += '<div class="history-month">';
+                html += '<h3 class="history-month-title">' + month.month_label + '</h3>';
+
+                month.activities.forEach(function(activity) {
+                    var categoryClass = 'category-' + (activity.category || 'autre');
+
+                    html += '<div class="history-card ' + categoryClass + '">';
+                    html += '  <div class="history-card-header">';
+                    html += '    <div class="history-card-title">' + (activity.period_label || 'Week-end') + '</div>';
+                    html += '    <div class="history-card-date">' + formatDate(activity.period_start) + '</div>';
+                    html += '  </div>';
+
+                    // Films
+                    if (activity.films_seen && activity.films_seen.length > 0) {
+                        html += '<div class="history-details">';
+                        html += '  <strong>🎬 Films :</strong>';
+                        html += '  <ul class="history-details-list">';
+                        activity.films_seen.forEach(function(film) {
+                            html += '<li>' + escapeHtml(film) + '</li>';
+                        });
+                        html += '  </ul>';
+                        html += '</div>';
+                    }
+
+                    // Concerts
+                    if (activity.concerts_seen && activity.concerts_seen.length > 0) {
+                        html += '<div class="history-details">';
+                        html += '  <strong>🎵 Concerts :</strong>';
+                        html += '  <ul class="history-details-list">';
+                        activity.concerts_seen.forEach(function(concert) {
+                            html += '<li>' + escapeHtml(concert) + '</li>';
+                        });
+                        html += '  </ul>';
+                        html += '</div>';
+                    }
+
+                    // Expos
+                    if (activity.expos_seen && activity.expos_seen.length > 0) {
+                        html += '<div class="history-details">';
+                        html += '  <strong>🖼️ Expos :</strong>';
+                        html += '  <ul class="history-details-list">';
+                        activity.expos_seen.forEach(function(expo) {
+                            html += '<li>' + escapeHtml(expo) + '</li>';
+                        });
+                        html += '  </ul>';
+                        html += '</div>';
+                    }
+
+                    if (activity.note) {
+                        html += '<div class="history-details">';
+                        html += '  <strong>📝</strong> ' + escapeHtml(activity.note);
+                        html += '</div>';
+                    }
+
+                    html += '</div>';
+                });
+
+                html += '</div>';
+            });
+
+            timeline.innerHTML = html;
+        }
+
+        function formatDate(dateStr) {
+            if (!dateStr) return '';
+            var date = new Date(dateStr);
+            return date.toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' });
+        }
+
+        function escapeHtml(text) {
+            var div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
     </script>
 </body>
 </html>

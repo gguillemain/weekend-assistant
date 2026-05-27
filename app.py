@@ -171,13 +171,19 @@ def profile_route():
     user_profile = profile.get_profile()
     stats = profile.get_activity_stats()
     recent_feedback = profile.get_recent_feedback(10)
-    recent_activities = profile.get_recent_activities(10)
+
+    # Mode complet ou récent selon param
+    mode = request.args.get('mode', 'recent')
+    if mode == 'full':
+        activities = profile.get_full_activity_history(limit=50)
+    else:
+        activities = profile.get_recent_activities(10)
 
     return jsonify({
         "profile": user_profile,
         "stats": stats,
         "recent_feedback": recent_feedback,
-        "recent_activities": recent_activities
+        "activities": activities
     })
 
 

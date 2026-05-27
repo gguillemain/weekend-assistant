@@ -658,6 +658,30 @@ def get_discovery_events(period: Dict, verbose: bool = False) -> List[Dict]:
             seen.add(key)
             unique_events.append(event)
 
+    # Déduplication : filtrer les événements déjà vus (6 mois)
+    from engine.profile import get_seen_items_normalized, normalize_for_matching
+
+    seen_concerts = get_seen_items_normalized('concerts', days=180)
+    seen_expos = get_seen_items_normalized('expos', days=180)
+
+    filtered_by_history = []
+    for event in unique_events:
+        event_normalized = normalize_for_matching(event["title"])
+
+        if event["category"] == "concert" and event_normalized in seen_concerts:
+            if verbose:
+                print(f"  [SKIP] Concert déjà vu : {event['title']}")
+            continue
+
+        if event["category"] in ["exposition", "culture"] and event_normalized in seen_expos:
+            if verbose:
+                print(f"  [SKIP] Expo déjà vue : {event['title']}")
+            continue
+
+        filtered_by_history.append(event)
+
+    unique_events = filtered_by_history
+
     # Calculer surprise_score
     for event in unique_events:
         event["surprise_score"] = _calculate_surprise_score(

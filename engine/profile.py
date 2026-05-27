@@ -3,10 +3,71 @@ Module de gestion du profil utilisateur et des statistiques d'activité.
 """
 
 import json
+import unicodedata
+import re
 from datetime import datetime, date, timedelta
 from typing import Dict, List, Any, Optional
 
 from engine.database import get_connection
+
+
+def normalize_for_matching(text: str) -> str:
+    """Normalise un titre pour comparaison (accents, ponctuation, casse)."""
+    if not text:
+        return ""
+    text = text.lower()
+    # Supprimer accents
+    text = unicodedata.normalize('NFD', text)
+    text = ''.join(c for c in text if unicodedata.category(c) != 'Mn')
+    # Supprimer ponctuation
+    text = re.sub(r'[^\w\s-]', ' ', text)
+    text = re.sub(r'\s+', ' ', text)
+    return text.strip()
+
+
+def get_seen_items_normalized(activity_type: str, days: int = 180) -> set:
+    """
+    Retourne un set de titres normalisés vus dans les N derniers jours.
+
+    Args:
+        activity_type: 'films', 'concerts', ou 'expos'
+        days: Nombre de jours dans le passé (défaut 180 = 6 mois)
+    """
+    conn = get_connection()
+    cursor = conn.cursor()
+
+    cutoff_date = (date.today() - timedelta(days=days)).isoformat()
+
+    field_map = {
+        'films': 'films_seen',
+        'concerts': 'concerts_seen',
+        'expos': 'expos_seen'
+    }
+
+    field = field_map.get(activity_type)
+    if not field:
+        return set()
+
+    cursor.execute(f"""
+        SELECT {field} FROM activity_log
+        WHERE {field} IS NOT NULL
+        AND period_start >= ?
+        ORDER BY period_start DESC
+    """, (cutoff_date,))
+
+    seen = set()
+    for row in cursor.fetchall():
+        try:
+            items = json.loads(row[field])
+            for item in items:
+                normalized = normalize_for_matching(item)
+                if normalized:
+                    seen.add(normalized)
+        except (json.JSONDecodeError, TypeError):
+            pass
+
+    conn.close()
+    return seen
 
 
 def get_profile() -> Dict[str, Any]:
@@ -298,3 +359,63 @@ def get_recent_activities(limit: int = 10) -> List[Dict]:
     results = [dict(row) for row in cursor.fetchall()]
     conn.close()
     return results
+
+
+def get_full_activity_history(limit: int = 50) -> Dict:
+    """Retourne l'historique complet groupé par mois."""
+    conn = get_connection()
+    cursor = conn.cursor()
+
+    cursor.execute("""
+        SELECT
+            id, period_label, period_start, period_end, category, note,
+            films_seen, concerts_seen, expos_seen, stayed_home_reason, created_at
+        FROM activity_log
+        ORDER BY period_start DESC
+        LIMIT ?
+    """, (limit,))
+
+    activities = []
+    for row in cursor.fetchall():
+        activity = dict(row)
+
+        # Désérialiser JSON fields
+        for field in ['films_seen', 'concerts_seen', 'expos_seen']:
+            if activity[field]:
+                try:
+                    activity[field] = json.loads(activity[field])
+                except json.JSONDecodeError:
+                    activity[field] = []
+            else:
+                activity[field] = []
+
+        activities.append(activity)
+
+    conn.close()
+
+    # Grouper par mois
+    grouped = {}
+    for activity in activities:
+        if not activity['period_start']:
+            continue
+
+        try:
+            period_date = datetime.strptime(activity['period_start'], '%Y-%m-%d')
+            month_key = period_date.strftime('%Y-%m')
+            month_label = period_date.strftime('%B %Y')
+        except ValueError:
+            month_key = 'unknown'
+            month_label = 'Date inconnue'
+
+        if month_key not in grouped:
+            grouped[month_key] = {
+                'month_label': month_label,
+                'activities': []
+            }
+
+        grouped[month_key]['activities'].append(activity)
+
+    return {
+        'total': len(activities),
+        'grouped': [v for k, v in sorted(grouped.items(), reverse=True)]
+    }

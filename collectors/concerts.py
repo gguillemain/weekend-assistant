@@ -397,6 +397,23 @@ def get_concerts(period: Dict, profile: Dict, verbose: bool = False) -> List[Dic
             seen.add(key)
             unique_concerts.append(concert)
 
+    # Filtrer les concerts déjà vus (1 an)
+    from engine.profile import get_seen_items_normalized, normalize_for_matching
+
+    seen_concerts = get_seen_items_normalized('concerts', days=365)
+
+    history_filtered = []
+    for concert in unique_concerts:
+        concert_normalized = normalize_for_matching(concert["artist"])
+        concert_venue_key = f"{concert_normalized} {normalize_for_matching(concert['venue'])}"
+
+        if concert_normalized not in seen_concerts and concert_venue_key not in seen_concerts:
+            history_filtered.append(concert)
+        elif verbose:
+            print(f"  [SKIP] Concert déjà vu : {concert['artist']} @ {concert['venue']}")
+
+    unique_concerts = history_filtered
+
     # Calculer profile_match pour chaque concert
     for concert in unique_concerts:
         concert["profile_match"] = _calculate_profile_match(

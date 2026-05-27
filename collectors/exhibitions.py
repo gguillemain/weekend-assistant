@@ -757,6 +757,23 @@ def get_exhibitions(period: Dict, profile: Dict, verbose: bool = False) -> List[
                 filtered.append(expo)
                 continue
 
+    # Déduplication : filtrer les expositions déjà vues (1 an)
+    from engine.profile import get_seen_items_normalized, normalize_for_matching
+
+    seen_expos = get_seen_items_normalized('expos', days=365)
+
+    deduplicated = []
+    for expo in filtered:
+        expo_normalized = normalize_for_matching(expo["title"])
+        expo_venue_key = f"{expo_normalized} {normalize_for_matching(expo['venue'])}"
+
+        if expo_normalized not in seen_expos and expo_venue_key not in seen_expos:
+            deduplicated.append(expo)
+        elif verbose:
+            print(f"  [SKIP] Expo déjà vue : {expo['title']} @ {expo['venue']}")
+
+    filtered = deduplicated
+
     # Calculer profile_match
     for expo in filtered:
         expo["profile_match"] = _calculate_profile_match(
