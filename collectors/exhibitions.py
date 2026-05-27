@@ -820,7 +820,6 @@ def format_exhibitions_context(exhibitions: List[Dict]) -> str:
         if date_start:
             if isinstance(date_start, str):
                 try:
-                    from datetime import datetime, date
                     date_obj = datetime.strptime(date_start, "%Y-%m-%d").date()
                     date_start_str = date_obj.strftime("%d/%m")
                 except ValueError:
@@ -837,7 +836,6 @@ def format_exhibitions_context(exhibitions: List[Dict]) -> str:
         if date_end:
             if isinstance(date_end, str):
                 try:
-                    from datetime import datetime, date
                     date_obj = datetime.strptime(date_end, "%Y-%m-%d").date()
                     date_end_str = date_obj.strftime("%d/%m/%Y")
                 except ValueError:
