@@ -924,7 +924,7 @@
 
                     buttons.forEach(function(b) { b.disabled = true; });
 
-                    fetch('feedback', {
+                    fetch('./feedback', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({
@@ -1002,7 +1002,7 @@
                     markButtonAsDone(btn);
 
                     // Envoyer à l'API
-                    fetch('mark-as-done', {
+                    fetch('./mark-as-done', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({
@@ -1175,7 +1175,7 @@
                 data.period_end = periodEnd;
                 data.period_label = periodLabel;
 
-                fetch('activity', {
+                fetch('./activity', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(data)
@@ -1218,7 +1218,7 @@
         function loadHistory() {
             if (historyLoaded) return;
 
-            fetch('profile?mode=full')
+            fetch('./profile?mode=full')
                 .then(function(response) {
                     if (!response.ok) throw new Error('HTTP ' + response.status);
                     return response.json();
