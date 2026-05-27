@@ -11,6 +11,9 @@ import re
 import config
 from engine.cache import cache_get, cache_set, CACHE_TTL
 
+# Session HTTP réutilisable (connection pooling)
+_session = requests.Session()
+
 # Distances depuis Guebwiller
 CITY_DISTANCES = getattr(config, "CITY_DISTANCES", {})
 
@@ -221,7 +224,7 @@ def _scrape_fondation_beyeler(verbose: bool = False) -> List[Dict]:
     exhibitions = []
 
     try:
-        resp = requests.get(url, headers=HEADERS, timeout=15)
+        resp = _session.get(url, headers=HEADERS, timeout=15)
         if verbose:
             print(f"  {source}: HTTP {resp.status_code}")
         resp.raise_for_status()
@@ -290,7 +293,7 @@ def _scrape_fondation_schneider(verbose: bool = False) -> List[Dict]:
     exhibitions = []
 
     try:
-        resp = requests.get(url, headers=HEADERS, timeout=15)
+        resp = _session.get(url, headers=HEADERS, timeout=15)
         if verbose:
             print(f"  {source}: HTTP {resp.status_code}")
         resp.raise_for_status()
@@ -370,7 +373,7 @@ def _scrape_fernet_branca(verbose: bool = False) -> List[Dict]:
     exhibitions = []
 
     try:
-        resp = requests.get(url, headers=HEADERS, timeout=15)
+        resp = _session.get(url, headers=HEADERS, timeout=15)
         if verbose:
             print(f"  {source}: HTTP {resp.status_code}")
         resp.raise_for_status()
@@ -458,7 +461,7 @@ def _scrape_musee_wurth(verbose: bool = False) -> List[Dict]:
     exhibitions = []
 
     try:
-        resp = requests.get(url, headers=HEADERS, timeout=15)
+        resp = _session.get(url, headers=HEADERS, timeout=15)
         if verbose:
             print(f"  {source}: HTTP {resp.status_code}")
         resp.raise_for_status()
@@ -476,7 +479,7 @@ def _scrape_musee_wurth(verbose: bool = False) -> List[Dict]:
                 expo_url = href
                 # Suivre le lien pour obtenir le titre
                 try:
-                    resp2 = requests.get(expo_url, headers=HEADERS, timeout=10)
+                    resp2 = _session.get(expo_url, headers=HEADERS, timeout=10)
                     soup2 = BeautifulSoup(resp2.content, "lxml")
                     title_el = soup2.find("h1")
                     title = title_el.get_text(strip=True) if title_el else ""
@@ -525,7 +528,7 @@ def _scrape_musees_strasbourg(verbose: bool = False) -> List[Dict]:
     exhibitions = []
 
     try:
-        resp = requests.get(url, headers=HEADERS, timeout=15)
+        resp = _session.get(url, headers=HEADERS, timeout=15)
         if verbose:
             print(f"  {source}: HTTP {resp.status_code}")
         resp.raise_for_status()
@@ -583,7 +586,7 @@ def _scrape_kunstmuseum_basel(verbose: bool = False) -> List[Dict]:
     exhibitions = []
 
     try:
-        resp = requests.get(url, headers=HEADERS, timeout=15)
+        resp = _session.get(url, headers=HEADERS, timeout=15)
         if verbose:
             print(f"  {source}: HTTP {resp.status_code}")
         resp.raise_for_status()

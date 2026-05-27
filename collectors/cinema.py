@@ -8,6 +8,9 @@ import time
 from collectors.rss_reader import fetch_rss, try_rss_urls
 from engine.cache import cache_get, cache_set, CACHE_TTL
 
+# Session HTTP réutilisable (connection pooling)
+_session = requests.Session()
+
 
 # Configuration des cinémas à scraper
 CINEMAS = [
@@ -213,7 +216,7 @@ def _scrape_telerama_fallback() -> Dict[str, int]:
 
     for url in urls:
         try:
-            response = requests.get(url, headers=HEADERS, timeout=15, allow_redirects=True)
+            response = _session.get(url, headers=HEADERS, timeout=15, allow_redirects=True)
             if response.status_code == 200:
                 soup = BeautifulSoup(response.content, "lxml")
                 picks = {}
@@ -324,7 +327,7 @@ def _scrape_cahiers_fallback() -> Set[str]:
     url = "https://www.cahiersducinema.com/critiques-de-films/"
 
     try:
-        response = requests.get(url, headers=HEADERS, timeout=15, allow_redirects=True)
+        response = _session.get(url, headers=HEADERS, timeout=15, allow_redirects=True)
         if response.status_code == 200:
             soup = BeautifulSoup(response.content, "lxml")
             picks = set()
@@ -497,7 +500,7 @@ def _scrape_cinema(cinema: Dict, period_start: date, period_end: date) -> List[D
         date_str = current_date.strftime("%Y-%m-%d")
 
         try:
-            response = requests.get(base_url, headers=HEADERS, timeout=10, params={"d": date_str})
+            response = _session.get(base_url, headers=HEADERS, timeout=10, params={"d": date_str})
             response.raise_for_status()
             soup = BeautifulSoup(response.content, "lxml")
 

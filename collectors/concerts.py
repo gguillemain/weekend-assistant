@@ -11,6 +11,9 @@ import config
 from collectors import rss_reader
 from engine.cache import cache_get, cache_set, CACHE_TTL
 
+# Session HTTP réutilisable (connection pooling)
+_session = requests.Session()
+
 
 # Coordonnées de base (Guebwiller)
 BASE_LAT = config.BASE_LOCATION["lat"]
@@ -138,7 +141,7 @@ def _fetch_ticketmaster(
     }
 
     try:
-        response = requests.get(
+        response = _session.get(
             TICKETMASTER_BASE_URL,
             params=params,
             timeout=15

@@ -12,7 +12,7 @@ from engine.database import get_connection, DB_PATH
 
 
 def _init_cache_table():
-    """Crée la table cache si elle n'existe pas."""
+    """Crée la table cache si elle n'existe pas, avec index pour performance."""
     conn = get_connection()
     cursor = conn.cursor()
 
@@ -23,6 +23,11 @@ def _init_cache_table():
             created_at DATETIME,
             expires_at DATETIME
         )
+    """)
+
+    # Index sur expires_at pour accélérer les lookups et le nettoyage
+    cursor.execute("""
+        CREATE INDEX IF NOT EXISTS idx_cache_expires_at ON cache(expires_at)
     """)
 
     conn.commit()

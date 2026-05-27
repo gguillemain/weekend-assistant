@@ -1,5 +1,6 @@
 import anthropic
 import json
+from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
 from typing import Dict, List
 
@@ -354,13 +355,27 @@ def generate_suggestions(period: Dict) -> Dict:
     else:
         # Mode week-end : suggestions locales
         user_profile = profile.get_profile()
-        weather_data = weather.get_weather_forecast(period)
-        movies = cinema.get_artetal_movies(period)
-        events_list = events.get_local_events(period)
+
+        # Paralléliser les appels API (gain de temps significatif)
+        with ThreadPoolExecutor(max_workers=6) as executor:
+            future_weather = executor.submit(weather.get_weather_forecast, period)
+            future_movies = executor.submit(cinema.get_artetal_movies, period)
+            future_events = executor.submit(events.get_local_events, period)
+            future_concerts = executor.submit(concerts.get_concerts, period, user_profile)
+            future_exhibitions = executor.submit(exhibitions.get_exhibitions, period, user_profile)
+            future_discovery = executor.submit(discovery.get_discovery_events, period)
+
+            # Récupérer les résultats
+            weather_data = future_weather.result()
+            movies = future_movies.result()
+            events_list = future_events.result()
+            concerts_list = future_concerts.result()
+            exhibitions_list = future_exhibitions.result()
+            discovery_list = future_discovery.result()
+
+        # Hikes dépend de weather_data, exécuté après
         hikes = hiking.get_hiking_suggestions(period, weather_data)
-        concerts_list = concerts.get_concerts(period, user_profile)
-        exhibitions_list = exhibitions.get_exhibitions(period, user_profile)
-        discovery_list = discovery.get_discovery_events(period)
+
         user_prompt = _build_user_prompt(period, weather_data, movies, events_list, hikes, concerts_list, exhibitions_list, discovery_list)
         system_prompt = BASE_SYSTEM_PROMPT.format(profile_section=profile_section)
         travel_data = {}
