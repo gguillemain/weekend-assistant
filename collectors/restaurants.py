@@ -51,10 +51,11 @@ CUISINE_KEYWORDS = {
 
 
 def _get_foursquare_headers() -> Dict[str, str]:
-    """Retourne les headers pour l'API Foursquare."""
+    """Retourne les headers pour l'API Foursquare (nouvelle API 2025)."""
     return {
-        "Authorization": config.FOURSQUARE_API_KEY,
-        "Accept": "application/json"
+        "Authorization": f"Bearer {config.FOURSQUARE_API_KEY}",
+        "Accept": "application/json",
+        "X-Places-Api-Version": "2025-06-17"
     }
 
 
@@ -68,11 +69,21 @@ def _detect_cuisine_type(name: str, categories: List[Dict]) -> str:
             if keyword in name_lower:
                 return cuisine.capitalize()
 
-    # Ensuite chercher dans les catégories Foursquare
+    # Ensuite chercher dans les catégories Foursquare (nouvelle API avec BSON IDs)
+    # On utilise le nom de la catégorie plutôt que l'ID
     for cat in categories:
-        cat_id = str(cat.get("id", ""))
-        if cat_id in CUISINE_CATEGORY_MAP:
-            return CUISINE_CATEGORY_MAP[cat_id]
+        cat_name = cat.get("name", "").lower()
+        # Mapping par nom de catégorie
+        if any(kw in cat_name for kw in ["french", "bistro", "brasserie"]):
+            return "Francais"
+        if any(kw in cat_name for kw in ["italian", "pizza", "pasta"]):
+            return "Italien"
+        if any(kw in cat_name for kw in ["japanese", "chinese", "vietnamese", "thai", "sushi", "asian"]):
+            return "Asiatique"
+        if any(kw in cat_name for kw in ["fine dining", "gourmet"]):
+            return "Gastronomique"
+        if any(kw in cat_name for kw in ["alsacien", "winstub"]):
+            return "Alsacien"
 
     return "Francais"  # Défaut
 
@@ -101,21 +112,22 @@ def _calculate_distance(lat1: float, lon1: float, lat2: float, lon2: float) -> f
 
 
 def _fetch_restaurants_from_foursquare() -> List[Dict]:
-    """Récupère les restaurants depuis Foursquare Places API."""
+    """Récupère les restaurants depuis Foursquare Places API (nouvelle API 2025)."""
     api_key = config.FOURSQUARE_API_KEY
 
     if not api_key:
         print("  ⚠ Restaurants : FOURSQUARE_API_KEY non configurée")
         return []
 
-    url = "https://api.foursquare.com/v3/places/search"
+    # Nouvelle URL API 2025 (sans /v3/)
+    url = "https://places-api.foursquare.com/places/search"
 
     params = {
         "ll": f"{GUEBWILLER_LAT},{GUEBWILLER_LON}",
         "radius": SEARCH_RADIUS,
         "categories": FOURSQUARE_CATEGORIES,
         "limit": 50,
-        "fields": "fsq_id,name,location,categories,rating,price,popularity,stats"
+        "fields": "fsq_place_id,name,location,categories,rating,price,popularity,latitude,longitude"
     }
 
     all_restaurants = []
@@ -128,14 +140,15 @@ def _fetch_restaurants_from_foursquare() -> List[Dict]:
         results = data.get("results", [])
 
         for place in results:
-            location = place.get("location", {})
-            lat = location.get("latitude", GUEBWILLER_LAT)
-            lng = location.get("longitude", GUEBWILLER_LON)
+            # Nouvelle API : latitude/longitude directement ou dans location
+            lat = place.get("latitude") or place.get("location", {}).get("latitude", GUEBWILLER_LAT)
+            lng = place.get("longitude") or place.get("location", {}).get("longitude", GUEBWILLER_LON)
 
             # Calculer la distance
             distance = _calculate_distance(GUEBWILLER_LAT, GUEBWILLER_LON, lat, lng)
 
-            # Extraire la ville
+            # Extraire la ville depuis location
+            location = place.get("location", {})
             city = location.get("locality", location.get("region", ""))
 
             # Détecter le type de cuisine
@@ -146,14 +159,9 @@ def _fetch_restaurants_from_foursquare() -> List[Dict]:
             rating_10 = place.get("rating", 0)
             rating = round(rating_10 / 2, 1) if rating_10 else 0
 
-            # Stats (nombre de visites/tips comme proxy pour avis)
-            stats = place.get("stats", {})
-            reviews_count = stats.get("total_tips", 0) + stats.get("total_photos", 0)
-
-            # Popularity comme indicateur alternatif
+            # Popularity comme proxy pour les avis (stats supprimé dans nouvelle API)
             popularity = place.get("popularity", 0)
-            if reviews_count == 0 and popularity > 0:
-                reviews_count = int(popularity * 100)  # Estimation
+            reviews_count = int(popularity * 100) if popularity > 0 else 0
 
             # Construire l'adresse
             address = location.get("formatted_address", location.get("address", ""))
@@ -170,7 +178,7 @@ def _fetch_restaurants_from_foursquare() -> List[Dict]:
                 "reviews_count": reviews_count,
                 "price_level": _price_level_to_string(place.get("price")),
                 "address": address,
-                "fsq_id": place.get("fsq_id", ""),
+                "fsq_id": place.get("fsq_place_id", ""),
                 "url": maps_url,
                 "reason": ""
             }

@@ -1,7 +1,7 @@
 # Weekend Assistant - Contexte de reprise
 
 > Assistant personnel de loisirs pour un couple d'enseignants alsaciens (Guebwiller, Haut-Rhin).
-> Génère des suggestions de week-end basées sur la météo, les films, événements, randonnées, concerts et expositions.
+> Génère des suggestions de week-end basées sur la météo, les films, événements, randonnées, concerts, expositions et restaurants.
 
 ## 1. Architecture du projet
 
@@ -33,6 +33,7 @@ weekend_assistant/
 │   ├── concerts.py           # Ticketmaster API FR/CH/DE, 180km (cache 6h)
 │   ├── exhibitions.py        # Scraping fondations/musées, 6 sources (cache 12h)
 │   ├── discovery.py          # Bons plans : DNA RSS, Tourisme Alsace, Freiburg (cache 4h)
+│   ├── restaurants.py        # Foursquare Places API, rayon 20km (cache 8h)
 │   ├── openagenda.py         # API OpenAgenda (4 agendas Alsace)
 │   └── rss_reader.py         # Utilitaire parsing RSS/Atom
 │
@@ -61,10 +62,11 @@ weekend_assistant/
 | `concerts.py` | Ticketmaster API (FR/CH/DE) | Rayon 180km, déduplication, cache 6h |
 | `exhibitions.py` | 6 sources : Beyeler, Schneider, Fernet-Branca, Würth, Strasbourg, Kunstmuseum | profile_match, cache 12h |
 | `discovery.py` | DNA RSS (4 feeds), Tourisme Alsace, OpenAgenda, Freiburg | surprise_score, cache 4h |
+| `restaurants.py` | Foursquare Places API, rayon 20km | Mix 3 restos (bien noté, proche, cuisine variée), cache 8h |
 | `openagenda.py` | API OpenAgenda | 4 agendas : Haut-Rhin, Alsace, Mulhouse, Colmar |
 | `cache.py` | Cache SQLite avec TTL | HIT x2600 plus rapide (44s → 17ms) |
 | `suggest.py` | Génération suggestions via Claude API | JSON structuré, tous collectors intégrés |
-| `profile.py` | Profil utilisateur, feedback, journal | Films/concerts/expos vus, streak_home |
+| `profile.py` | Profil utilisateur, feedback, journal | Films/concerts/expos/restaurants vus, streak_home |
 | `index.html` | Interface magazine-style | Responsive, badges colorés, boutons feedback |
 
 ### Partiellement fonctionnel (⚠)
@@ -94,6 +96,7 @@ weekend_assistant/
 | concerts | 6h | Billetterie stable |
 | discovery | 4h | Actualités plus fraîches |
 | exhibitions | 12h | Expositions changent peu |
+| restaurants | 8h | Données stables, mix renouvelé |
 | hiking | 24h | Sentiers très stables |
 
 ### Performance mesurée
@@ -142,6 +145,19 @@ curl -X DELETE http://127.0.0.1:5000/cache-clear?mode=expired
 | Musées de Strasbourg | Strasbourg | 100km |
 | Kunstmuseum Basel | Bâle | 45km |
 
+### restaurants.py (1 source)
+
+| Source | Type | Rayon |
+|--------|------|-------|
+| Foursquare Places API | API | 20km |
+
+**Stratégie de sélection** : Mix de 3 restaurants
+1. Un restaurant bien noté (>4.0, populaire)
+2. Un restaurant proche (<10km)
+3. Un restaurant de cuisine différente
+
+**Déduplication** : Restaurants vus exclus pendant 90 jours.
+
 ## 5. Problèmes connus et contournements
 
 ### Télérama false positives
@@ -177,6 +193,7 @@ curl -X DELETE http://127.0.0.1:5000/cache-clear?mode=expired
 - [x] Cache SQLite (x2600 plus rapide)
 - [x] Sources Discovery + OpenAgenda
 - [x] Sources allemandes (Freiburg)
+- [x] Restaurants Foursquare API
 
 ### Phase 6 - Améliorations
 - [ ] Visorando : notes, photos, GPX
@@ -198,6 +215,7 @@ ANTHROPIC_API_KEY=sk-ant-...
 OPENWEATHER_API_KEY=...
 FLASK_SECRET_KEY=...
 TICKETMASTER_API_KEY=...  # developer.ticketmaster.com
+FOURSQUARE_API_KEY=...    # developer.foursquare.com
 
 # Configuration SMTP
 SMTP_HOST=smtp.gmail.com
@@ -293,5 +311,5 @@ expo_fondations: [
 
 ---
 
-*Dernière mise à jour : 24/05/2026*
-*Commits : ba235c2 (MVP) → 15878cd (cache SQLite) → 4220b28 (Freiburg)*
+*Dernière mise à jour : 03/06/2026*
+*Commits : ba235c2 (MVP) → 15878cd (cache SQLite) → 4220b28 (Freiburg) → 04014ce (restaurants Foursquare)*
