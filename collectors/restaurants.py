@@ -126,8 +126,8 @@ def _fetch_restaurants_from_foursquare() -> List[Dict]:
         "ll": f"{GUEBWILLER_LAT},{GUEBWILLER_LON}",
         "radius": SEARCH_RADIUS,
         "categories": FOURSQUARE_CATEGORIES,
-        "limit": 10,
-        "fields": "fsq_place_id,name,location,categories,rating,price,popularity,latitude,longitude"
+        "limit": 10
+        # fields retiré pour utiliser les valeurs par défaut
     }
 
     all_restaurants = []
