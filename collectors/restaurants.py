@@ -45,9 +45,24 @@ CUISINE_KEYWORDS = {
     "alsacien": ["winstub", "alsace", "alsacien", "choucroute", "flammekueche", "baeckeoffe", "caveau"],
     "italien": ["italien", "pizza", "pasta", "trattoria", "ristorante", "pizzeria", "osteria"],
     "asiatique": ["asiatique", "chinois", "japonais", "vietnamien", "thai", "sushi", "wok", "asia"],
-    "francais": ["français", "bistrot", "brasserie", "terroir", "traditionnel", "auberge"],
-    "gastronomique": ["gastronomique", "étoilé", "gourmet"],
+    "francais": ["français", "bistrot", "brasserie", "terroir", "traditionnel", "auberge", "hostellerie", "hôtellerie", "relais", "atelier"],
+    "gastronomique": ["gastronomique", "étoilé", "gourmet", "table", "maison"],
 }
+
+# Chaînes et fast-foods à exclure
+EXCLUDED_CHAINS = [
+    "mcdonald", "burger king", "kfc", "quick", "subway", "domino", "pizza hut",
+    "flunch", "buffalo grill", "hippopotamus", "courtepaille", "del arte",
+    "la pataterie", "léon de bruxelles", "au bureau", "columbus café",
+    "starbucks", "paul", "brioche dorée", "class croute", "pomme de pain",
+    "five guys", "o'tacos", "bagelstein", "eat sushi", "sushi shop"
+]
+
+# Catégories Foursquare à exclure (fast-food, etc.)
+EXCLUDED_CATEGORIES = [
+    "fast food", "burger", "sandwich", "coffee shop", "café", "bakery",
+    "ice cream", "donut", "bagel", "juice bar", "smoothie"
+]
 
 
 def _get_foursquare_headers() -> Dict[str, str]:
@@ -57,6 +72,25 @@ def _get_foursquare_headers() -> Dict[str, str]:
         "Accept": "application/json",
         "X-Places-Api-Version": "2025-06-17"
     }
+
+
+def _is_excluded_restaurant(name: str, categories: List[Dict]) -> bool:
+    """Vérifie si le restaurant est une chaîne ou fast-food à exclure."""
+    name_lower = name.lower()
+
+    # Vérifier le nom contre les chaînes exclues
+    for chain in EXCLUDED_CHAINS:
+        if chain in name_lower:
+            return True
+
+    # Vérifier les catégories
+    for cat in categories:
+        cat_name = cat.get("name", "").lower()
+        for excluded in EXCLUDED_CATEGORIES:
+            if excluded in cat_name:
+                return True
+
+    return False
 
 
 def _detect_cuisine_type(name: str, categories: List[Dict]) -> str:
@@ -126,8 +160,7 @@ def _fetch_restaurants_from_foursquare() -> List[Dict]:
         "ll": f"{GUEBWILLER_LAT},{GUEBWILLER_LON}",
         "radius": SEARCH_RADIUS,
         "categories": FOURSQUARE_CATEGORIES,
-        "limit": 10
-        # fields retiré pour utiliser les valeurs par défaut
+        "limit": 20  # On récupère plus pour filtrer les fast-foods
     }
 
     all_restaurants = []
@@ -140,6 +173,11 @@ def _fetch_restaurants_from_foursquare() -> List[Dict]:
         results = data.get("results", [])
 
         for place in results:
+            # Filtrer les chaînes et fast-foods
+            categories = place.get("categories", [])
+            if _is_excluded_restaurant(place.get("name", ""), categories):
+                continue
+
             # Nouvelle API : latitude/longitude directement ou dans location
             lat = place.get("latitude") or place.get("location", {}).get("latitude", GUEBWILLER_LAT)
             lng = place.get("longitude") or place.get("location", {}).get("longitude", GUEBWILLER_LON)
@@ -151,8 +189,7 @@ def _fetch_restaurants_from_foursquare() -> List[Dict]:
             location = place.get("location", {})
             city = location.get("locality", location.get("region", ""))
 
-            # Détecter le type de cuisine
-            categories = place.get("categories", [])
+            # Détecter le type de cuisine (categories déjà récupéré plus haut)
             cuisine = _detect_cuisine_type(place.get("name", ""), categories)
 
             # Rating Foursquare est sur 10, on le convertit sur 5
@@ -225,6 +262,24 @@ def _score_restaurant(restaurant: Dict) -> float:
     # Pénalité si pas de note
     if rating == 0:
         score -= 0.2
+
+    # Bonus pour restaurants gastronomiques/de qualité
+    cuisine = restaurant.get("cuisine", "").lower()
+    if cuisine == "gastronomique":
+        score += 0.3
+
+    # Bonus pour mots-clés de qualité dans le nom
+    name_lower = restaurant.get("title", "").lower()
+    quality_keywords = ["hostellerie", "hôtellerie", "relais", "atelier", "maison", "table", "auberge"]
+    if any(kw in name_lower for kw in quality_keywords):
+        score += 0.2
+
+    # Bonus pour niveau de prix élevé (signe de qualité)
+    price = restaurant.get("price_level", "")
+    if price in ["€€€", "€€€€"]:
+        score += 0.15
+    elif price == "€€":
+        score += 0.05
 
     return score
 
