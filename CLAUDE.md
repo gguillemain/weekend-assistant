@@ -2,7 +2,7 @@
 
 ## Vue d'ensemble
 
-Application Flask de suggestions d'activités pour le week-end (région Alsace/Bâle). Collecte des données de plusieurs sources (cinéma, concerts, expos, randonnées, météo) et propose des recommandations personnalisées.
+Application Flask de suggestions d'activités pour le week-end (région Alsace/Bâle). Collecte des données de plusieurs sources (cinéma, concerts, expos, randonnées, restaurants, météo) et propose des recommandations personnalisées.
 
 ## Architecture
 
@@ -16,6 +16,7 @@ weekend_assistant/
 │   ├── exhibitions.py     # Expositions (scraping musées)
 │   ├── events.py          # Événements locaux (JDS, Strasbourg.eu)
 │   ├── hiking.py          # Randonnées (Visorando scraping)
+│   ├── restaurants.py     # Restaurants (Foursquare API)
 │   ├── discovery.py       # Découvertes diverses
 │   └── weather.py         # Météo (API OpenWeatherMap)
 ├── engine/
@@ -114,7 +115,7 @@ SQLite stockée dans `data/preferences.db` (volume Docker monté).
 
 ### Tables principales
 
-- **activity_log** : Historique des activités (films vus, concerts, expos, randos)
+- **activity_log** : Historique des activités (films vus, concerts, expos, randos, restaurants)
 - **suggestion_feedback** : Feedback utilisateur sur les suggestions
 - **user_profile** : Préférences utilisateur
 
@@ -122,7 +123,7 @@ SQLite stockée dans `data/preferences.db` (volume Docker monté).
 
 Les collectors utilisent `get_seen_items_normalized()` pour éviter de re-suggérer des éléments déjà vus :
 - Concerts/Expos : 365 jours
-- Randonnées : 90 jours
+- Randonnées/Restaurants : 90 jours
 - Discovery : 180 jours
 
 ## Points d'attention
@@ -138,6 +139,7 @@ Les collectors utilisent `get_seen_items_normalized()` pour éviter de re-suggé
 ```
 OPENWEATHERMAP_API_KEY=...
 TICKETMASTER_API_KEY=...
+FOURSQUARE_API_KEY=...
 ```
 
 ## Développement local
