@@ -5,7 +5,7 @@ from datetime import datetime
 from typing import Dict, List
 
 from engine import calendar_engine, profile
-from collectors import weather, cinema, events, hiking, travel, concerts, exhibitions, discovery
+from collectors import weather, cinema, events, hiking, travel, concerts, exhibitions, discovery, restaurants
 
 
 BASE_SYSTEM_PROMPT = """Tu es un assistant personnel de loisirs pour un couple
@@ -270,7 +270,7 @@ Mélange city breaks proches et destinations plus lointaines si la durée le per
 {request}"""
 
 
-def _build_user_prompt(period: Dict, weather_data: Dict, movies: List[Dict], events_list: List[Dict], hikes: List[Dict], concerts_list: List[Dict] = None, exhibitions_list: List[Dict] = None, discovery_list: List[Dict] = None) -> str:
+def _build_user_prompt(period: Dict, weather_data: Dict, movies: List[Dict], events_list: List[Dict], hikes: List[Dict], concerts_list: List[Dict] = None, exhibitions_list: List[Dict] = None, discovery_list: List[Dict] = None, restaurants_list: List[Dict] = None) -> str:
     """Construit le prompt utilisateur complet."""
     period_info = f"""Période : {period['label']}
 Dates : du {period['start'].strftime('%d/%m/%Y')} au {period['end'].strftime('%d/%m/%Y')}
@@ -284,6 +284,7 @@ Mode : {period['mode']}"""
     concerts_context = concerts.format_concerts_context(concerts_list) if concerts_list else ""
     exhibitions_context = exhibitions.format_exhibitions_context(exhibitions_list) if exhibitions_list else ""
     discovery_context = discovery.format_discovery_context(discovery_list) if discovery_list else ""
+    restaurants_context = restaurants.format_restaurants_context(restaurants_list) if restaurants_list else ""
 
     request = """Propose 3 à 5 suggestions pour cette période.
 
@@ -325,6 +326,8 @@ Privilégie la variété : mélange cinéma, randonnée, exposition, concert, d�
 
 {discovery_context}
 
+{restaurants_context}
+
 {request}"""
 
 
@@ -352,18 +355,20 @@ def generate_suggestions(period: Dict) -> Dict:
         concerts_list = []
         exhibitions_list = []
         discovery_list = []
+        restaurants_list = []
     else:
         # Mode week-end : suggestions locales
         user_profile = profile.get_profile()
 
         # Paralléliser les appels API (gain de temps significatif)
-        with ThreadPoolExecutor(max_workers=6) as executor:
+        with ThreadPoolExecutor(max_workers=7) as executor:
             future_weather = executor.submit(weather.get_weather_forecast, period)
             future_movies = executor.submit(cinema.get_artetal_movies, period)
             future_events = executor.submit(events.get_local_events, period)
             future_concerts = executor.submit(concerts.get_concerts, period, user_profile)
             future_exhibitions = executor.submit(exhibitions.get_exhibitions, period, user_profile)
             future_discovery = executor.submit(discovery.get_discovery_events, period)
+            future_restaurants = executor.submit(restaurants.get_restaurant_suggestions, period)
 
             # Récupérer les résultats
             weather_data = future_weather.result()
@@ -372,11 +377,12 @@ def generate_suggestions(period: Dict) -> Dict:
             concerts_list = future_concerts.result()
             exhibitions_list = future_exhibitions.result()
             discovery_list = future_discovery.result()
+            restaurants_list = future_restaurants.result()
 
         # Hikes dépend de weather_data, exécuté après
         hikes = hiking.get_hiking_suggestions(period, weather_data)
 
-        user_prompt = _build_user_prompt(period, weather_data, movies, events_list, hikes, concerts_list, exhibitions_list, discovery_list)
+        user_prompt = _build_user_prompt(period, weather_data, movies, events_list, hikes, concerts_list, exhibitions_list, discovery_list, restaurants_list)
         system_prompt = BASE_SYSTEM_PROMPT.format(profile_section=profile_section)
         travel_data = {}
 
@@ -429,6 +435,7 @@ def generate_suggestions(period: Dict) -> Dict:
         "concerts": concerts_list[:5] if concerts_list else [],
         "exhibitions": exhibitions_list[:4] if exhibitions_list else [],
         "discovery": discovery_list[:4] if discovery_list else [],
+        "restaurants": restaurants_list[:3] if restaurants_list else [],
         "travel": travel_data if is_vacation else {},
         "is_vacation": is_vacation,
         "suggestions": suggestions,

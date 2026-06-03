@@ -83,6 +83,7 @@ def _migrate_activity_log(cursor):
         ("concerts_seen", "TEXT"),
         ("expos_seen", "TEXT"),
         ("hiking_seen", "TEXT"),
+        ("restaurants_seen", "TEXT"),
         ("stayed_home_reason", "TEXT"),
     ]
 

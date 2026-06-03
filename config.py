@@ -7,6 +7,7 @@ ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY")
 OPENWEATHER_API_KEY = os.getenv("OPENWEATHER_API_KEY")
 FLASK_SECRET_KEY = os.getenv("FLASK_SECRET_KEY")
 TICKETMASTER_API_KEY = os.getenv("TICKETMASTER_API_KEY")
+GOOGLE_PLACES_API_KEY = os.getenv("GOOGLE_PLACES_API_KEY")
 
 # Configuration SMTP pour l'envoi d'emails
 SMTP_HOST = os.getenv("SMTP_HOST", "smtp.gmail.com")

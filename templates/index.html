@@ -522,6 +522,76 @@
             text-decoration: underline;
         }
 
+        /* Restaurant cards */
+        .restaurant-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+            gap: 1rem;
+        }
+
+        .restaurant-card {
+            background: var(--white);
+            border-radius: 10px;
+            padding: 1rem;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.05);
+        }
+
+        .restaurant-card h4 {
+            font-size: 0.95rem;
+            margin-bottom: 0.5rem;
+            color: var(--anthracite);
+        }
+
+        .restaurant-meta {
+            display: flex;
+            gap: 0.5rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .cuisine-badge {
+            background: var(--sage-light);
+            color: var(--white);
+            padding: 0.2rem 0.5rem;
+            border-radius: 12px;
+            font-size: 0.75rem;
+            font-weight: 500;
+        }
+
+        .price-badge {
+            background: var(--amber);
+            color: var(--white);
+            padding: 0.2rem 0.5rem;
+            border-radius: 12px;
+            font-size: 0.75rem;
+            font-weight: 500;
+        }
+
+        .restaurant-details {
+            font-size: 0.85rem;
+            color: #555;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.75rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .restaurant-reason {
+            font-size: 0.8rem;
+            color: var(--gray);
+            font-style: italic;
+            margin-bottom: 0.5rem;
+        }
+
+        .restaurant-card a {
+            color: var(--sage);
+            text-decoration: none;
+            font-size: 0.8rem;
+        }
+
+        .restaurant-card a:hover {
+            text-decoration: underline;
+        }
+
         /* Footer */
         footer {
             text-align: center;
@@ -788,6 +858,33 @@
                 <p class="start">Départ : {{ hike.start_city or 'NC' }} ({{ hike.distance_from_home|int }} km)</p>
                 {% if hike.url %}
                 <a href="{{ hike.url }}" target="_blank">Voir sur Visorando →</a>
+                {% endif %}
+            </article>
+            {% endfor %}
+        </div>
+        {% endif %}
+
+        <!-- Restaurants -->
+        {% if show_restaurants and restaurants %}
+        <h2 class="section-title">Restaurants du week-end</h2>
+
+        <div class="restaurant-grid">
+            {% for resto in restaurants %}
+            <article class="restaurant-card">
+                <h4>{{ resto.title }}</h4>
+                <div class="restaurant-meta">
+                    <span class="cuisine-badge">{{ resto.cuisine }}</span>
+                    <span class="price-badge">{{ resto.price_level }}</span>
+                </div>
+                <div class="restaurant-details">
+                    <span>📍 {{ resto.city }} ({{ resto.distance_km }} km)</span>
+                    {% if resto.rating > 0 %}
+                    <span>⭐ {{ "%.1f"|format(resto.rating) }}/5 ({{ resto.reviews_count }} avis)</span>
+                    {% endif %}
+                </div>
+                <p class="restaurant-reason">{{ resto.reason }}</p>
+                {% if resto.url %}
+                <a href="{{ resto.url }}" target="_blank">Voir sur Google Maps →</a>
                 {% endif %}
             </article>
             {% endfor %}

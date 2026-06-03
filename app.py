@@ -86,6 +86,8 @@ def index():
                                movies=[],
                                hikes=[],
                                show_hiking=False,
+                               restaurants=[],
+                               show_restaurants=False,
                                is_vacation=False,
                                travel={},
                                generated_at=result.get("generated_at"))
@@ -106,6 +108,9 @@ def index():
     if not is_vacation and weather_data.get("days"):
         show_hiking = any(d.get("suitable_outdoor", False) for d in weather_data["days"])
 
+    # Restaurants toujours affichés en mode week-end
+    show_restaurants = not is_vacation
+
     return render_template("index.html",
                            period=result["period"],
                            weather=weather_data,
@@ -114,6 +119,8 @@ def index():
                            movies=movies,
                            hikes=result.get("hikes", [])[:3],
                            show_hiking=show_hiking,
+                           restaurants=result.get("restaurants", [])[:3],
+                           show_restaurants=show_restaurants,
                            is_vacation=is_vacation,
                            travel=result.get("travel", {}),
                            generated_at=result["generated_at"])

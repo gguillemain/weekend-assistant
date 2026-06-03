@@ -222,4 +222,5 @@ CACHE_TTL = {
     "concerts": 360,     # 6h
     "discovery": 240,    # 4h
     "openagenda": 360,   # 6h
+    "restaurants": 480,  # 8h
 }
