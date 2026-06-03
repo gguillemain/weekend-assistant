@@ -1,5 +1,5 @@
 """
-Module de collecte de restaurants via Google Places API.
+Module de collecte de restaurants via Foursquare Places API.
 Propose 3 suggestions de restaurants locaux avec un mix de styles.
 """
 
@@ -17,46 +17,72 @@ GUEBWILLER_LON = 7.2147
 # Rayon de recherche en mètres (20km)
 SEARCH_RADIUS = 20000
 
-# Types de cuisines recherchées (rotation)
-CUISINE_TYPES = ["alsacien", "italien", "asiatique", "francais", "gastronomique"]
+# Catégories Foursquare pour restaurants
+# https://docs.foursquare.com/data-products/docs/categories
+FOURSQUARE_CATEGORIES = "13065"  # Restaurants
 
-# Mapping des types Google vers nos catégories
-GOOGLE_TYPE_KEYWORDS = {
-    "alsacien": ["winstub", "alsace", "alsacien", "choucroute", "flammekueche", "baeckeoffe"],
-    "italien": ["italien", "pizza", "pasta", "trattoria", "ristorante", "pizzeria"],
-    "asiatique": ["asiatique", "chinois", "japonais", "vietnamien", "thai", "sushi", "wok"],
-    "francais": ["français", "bistrot", "brasserie", "terroir", "traditionnel"],
-    "gastronomique": ["gastronomique", "étoilé", "gourmet", "fine dining"],
+# Mapping des catégories Foursquare vers nos types de cuisine
+CUISINE_CATEGORY_MAP = {
+    # Alsacien / Français
+    "13068": "Alsacien",      # French Restaurant
+    "13001": "Francais",      # Bistro
+    "13002": "Francais",      # Brasserie
+    # Italien
+    "13064": "Italien",       # Italian Restaurant
+    "13065": "Italien",       # Pizzeria (sous-catégorie)
+    # Asiatique
+    "13072": "Asiatique",     # Japanese Restaurant
+    "13099": "Asiatique",     # Chinese Restaurant
+    "13097": "Asiatique",     # Vietnamese Restaurant
+    "13352": "Asiatique",     # Thai Restaurant
+    "13303": "Asiatique",     # Sushi Restaurant
+    # Gastronomique
+    "13377": "Gastronomique", # Fine Dining Restaurant
+}
+
+# Mots-clés pour détecter le type de cuisine depuis le nom
+CUISINE_KEYWORDS = {
+    "alsacien": ["winstub", "alsace", "alsacien", "choucroute", "flammekueche", "baeckeoffe", "caveau"],
+    "italien": ["italien", "pizza", "pasta", "trattoria", "ristorante", "pizzeria", "osteria"],
+    "asiatique": ["asiatique", "chinois", "japonais", "vietnamien", "thai", "sushi", "wok", "asia"],
+    "francais": ["français", "bistrot", "brasserie", "terroir", "traditionnel", "auberge"],
+    "gastronomique": ["gastronomique", "étoilé", "gourmet"],
 }
 
 
-def _get_google_places_url() -> str:
-    """Retourne l'URL de l'API Google Places Nearby Search."""
-    return "https://maps.googleapis.com/maps/api/place/nearbysearch/json"
+def _get_foursquare_headers() -> Dict[str, str]:
+    """Retourne les headers pour l'API Foursquare."""
+    return {
+        "Authorization": config.FOURSQUARE_API_KEY,
+        "Accept": "application/json"
+    }
 
 
-def _detect_cuisine_type(name: str, types: List[str]) -> str:
-    """Détecte le type de cuisine depuis le nom et les types Google."""
+def _detect_cuisine_type(name: str, categories: List[Dict]) -> str:
+    """Détecte le type de cuisine depuis le nom et les catégories Foursquare."""
     name_lower = name.lower()
 
-    for cuisine, keywords in GOOGLE_TYPE_KEYWORDS.items():
+    # D'abord chercher dans les mots-clés du nom
+    for cuisine, keywords in CUISINE_KEYWORDS.items():
         for keyword in keywords:
             if keyword in name_lower:
-                return cuisine
+                return cuisine.capitalize()
 
-    # Mapping des types Google
-    if "meal_takeaway" in types or "meal_delivery" in types:
-        return "asiatique"  # Souvent asiatique
+    # Ensuite chercher dans les catégories Foursquare
+    for cat in categories:
+        cat_id = str(cat.get("id", ""))
+        if cat_id in CUISINE_CATEGORY_MAP:
+            return CUISINE_CATEGORY_MAP[cat_id]
 
-    return "francais"  # Défaut
+    return "Francais"  # Défaut
 
 
-def _price_level_to_string(price_level: Optional[int]) -> str:
-    """Convertit le niveau de prix Google en chaîne."""
-    if price_level is None:
+def _price_level_to_string(price: Optional[int]) -> str:
+    """Convertit le niveau de prix Foursquare en chaîne."""
+    if price is None:
         return "N/C"
-    mapping = {0: "Gratuit", 1: "€", 2: "€€", 3: "€€€", 4: "€€€€"}
-    return mapping.get(price_level, "N/C")
+    mapping = {1: "€", 2: "€€", 3: "€€€", 4: "€€€€"}
+    return mapping.get(price, "N/C")
 
 
 def _calculate_distance(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
@@ -74,76 +100,85 @@ def _calculate_distance(lat1: float, lon1: float, lat2: float, lon2: float) -> f
     return R * c
 
 
-def _fetch_restaurants_from_google() -> List[Dict]:
-    """Récupère les restaurants depuis Google Places API."""
-    api_key = config.GOOGLE_PLACES_API_KEY
+def _fetch_restaurants_from_foursquare() -> List[Dict]:
+    """Récupère les restaurants depuis Foursquare Places API."""
+    api_key = config.FOURSQUARE_API_KEY
 
     if not api_key:
-        print("  ⚠ Restaurants : GOOGLE_PLACES_API_KEY non configurée")
+        print("  ⚠ Restaurants : FOURSQUARE_API_KEY non configurée")
         return []
 
-    url = _get_google_places_url()
+    url = "https://api.foursquare.com/v3/places/search"
 
     params = {
-        "location": f"{GUEBWILLER_LAT},{GUEBWILLER_LON}",
+        "ll": f"{GUEBWILLER_LAT},{GUEBWILLER_LON}",
         "radius": SEARCH_RADIUS,
-        "type": "restaurant",
-        "key": api_key,
-        "language": "fr"
+        "categories": FOURSQUARE_CATEGORIES,
+        "limit": 50,
+        "fields": "fsq_id,name,location,categories,rating,price,popularity,stats"
     }
 
     all_restaurants = []
 
     try:
-        response = requests.get(url, params=params, timeout=15)
+        response = requests.get(url, headers=_get_foursquare_headers(), params=params, timeout=15)
         response.raise_for_status()
         data = response.json()
-
-        if data.get("status") != "OK":
-            error_msg = data.get("error_message", data.get("status", "Unknown error"))
-            print(f"  ⚠ Google Places API error: {error_msg}")
-            return []
 
         results = data.get("results", [])
 
         for place in results:
-            # Filtrer les restaurants fermés définitivement
-            if place.get("business_status") == "CLOSED_PERMANENTLY":
-                continue
-
-            # Extraire les coordonnées
-            location = place.get("geometry", {}).get("location", {})
-            lat = location.get("lat", GUEBWILLER_LAT)
-            lng = location.get("lng", GUEBWILLER_LON)
+            location = place.get("location", {})
+            lat = location.get("latitude", GUEBWILLER_LAT)
+            lng = location.get("longitude", GUEBWILLER_LON)
 
             # Calculer la distance
             distance = _calculate_distance(GUEBWILLER_LAT, GUEBWILLER_LON, lat, lng)
 
-            # Extraire la ville depuis l'adresse
-            vicinity = place.get("vicinity", "")
-            city = vicinity.split(",")[-1].strip() if "," in vicinity else vicinity
+            # Extraire la ville
+            city = location.get("locality", location.get("region", ""))
 
             # Détecter le type de cuisine
-            cuisine = _detect_cuisine_type(place.get("name", ""), place.get("types", []))
+            categories = place.get("categories", [])
+            cuisine = _detect_cuisine_type(place.get("name", ""), categories)
+
+            # Rating Foursquare est sur 10, on le convertit sur 5
+            rating_10 = place.get("rating", 0)
+            rating = round(rating_10 / 2, 1) if rating_10 else 0
+
+            # Stats (nombre de visites/tips comme proxy pour avis)
+            stats = place.get("stats", {})
+            reviews_count = stats.get("total_tips", 0) + stats.get("total_photos", 0)
+
+            # Popularity comme indicateur alternatif
+            popularity = place.get("popularity", 0)
+            if reviews_count == 0 and popularity > 0:
+                reviews_count = int(popularity * 100)  # Estimation
+
+            # Construire l'adresse
+            address = location.get("formatted_address", location.get("address", ""))
+
+            # URL Google Maps pour la navigation
+            maps_url = f"https://www.google.com/maps/search/?api=1&query={lat},{lng}"
 
             restaurant = {
                 "title": place.get("name", "Restaurant"),
-                "cuisine": cuisine.capitalize(),
+                "cuisine": cuisine,
                 "city": city,
                 "distance_km": round(distance, 1),
-                "rating": place.get("rating", 0),
-                "reviews_count": place.get("user_ratings_total", 0),
-                "price_level": _price_level_to_string(place.get("price_level")),
-                "address": vicinity,
-                "place_id": place.get("place_id", ""),
-                "url": f"https://www.google.com/maps/place/?q=place_id:{place.get('place_id', '')}",
+                "rating": rating,
+                "reviews_count": reviews_count,
+                "price_level": _price_level_to_string(place.get("price")),
+                "address": address,
+                "fsq_id": place.get("fsq_id", ""),
+                "url": maps_url,
                 "reason": ""
             }
 
             all_restaurants.append(restaurant)
 
     except requests.exceptions.RequestException as e:
-        print(f"  ⚠ Erreur Google Places API: {e}")
+        print(f"  ⚠ Erreur Foursquare API: {e}")
         return []
 
     return all_restaurants
@@ -153,11 +188,11 @@ def _score_restaurant(restaurant: Dict) -> float:
     """Calcule un score pour un restaurant."""
     score = 0.0
 
-    # Note Google (0-5) -> 0-0.5
+    # Note (0-5) -> 0-0.5
     rating = restaurant.get("rating", 0)
     score += (rating / 5) * 0.5
 
-    # Nombre d'avis (logarithmique)
+    # Nombre d'avis/activité (logarithmique)
     reviews = restaurant.get("reviews_count", 0)
     if reviews > 500:
         score += 0.3
@@ -189,8 +224,8 @@ def _score_restaurant(restaurant: Dict) -> float:
 def _select_mix_restaurants(restaurants: List[Dict], seen_restaurants: set) -> List[Dict]:
     """
     Sélectionne 3 restaurants avec une stratégie de mix :
-    1. Un restaurant bien noté (>4.2, >100 avis)
-    2. Une découverte (moins connu, <50 avis mais >4.0)
+    1. Un restaurant bien noté (>4.0, populaire)
+    2. Une découverte (moins connu mais bien noté)
     3. Une cuisine différente des deux premiers
     """
     if not restaurants:
@@ -206,7 +241,7 @@ def _select_mix_restaurants(restaurants: List[Dict], seen_restaurants: set) -> L
         available = restaurants  # Fallback si tous ont été vus
 
     # 1. Restaurant bien noté
-    well_rated = [r for r in available if r["rating"] >= 4.2 and r["reviews_count"] >= 100]
+    well_rated = [r for r in available if r["rating"] >= 4.0 and r["reviews_count"] >= 50]
     well_rated.sort(key=lambda r: _score_restaurant(r), reverse=True)
 
     if well_rated:
@@ -218,7 +253,7 @@ def _select_mix_restaurants(restaurants: List[Dict], seen_restaurants: set) -> L
 
     # 2. Découverte (moins connu mais bien noté)
     discoveries = [r for r in available
-                   if r["rating"] >= 4.0 and r["reviews_count"] < 50 and r["reviews_count"] > 5]
+                   if r["rating"] >= 3.8 and r["reviews_count"] < 50 and r["reviews_count"] > 0]
     discoveries.sort(key=lambda r: r["rating"], reverse=True)
 
     if discoveries:
@@ -230,7 +265,7 @@ def _select_mix_restaurants(restaurants: List[Dict], seen_restaurants: set) -> L
 
     # 3. Cuisine différente
     different_cuisine = [r for r in available
-                        if r["cuisine"].lower() not in used_cuisines and r["rating"] >= 3.8]
+                        if r["cuisine"].lower() not in used_cuisines and r["rating"] >= 3.5]
     different_cuisine.sort(key=lambda r: _score_restaurant(r), reverse=True)
 
     if different_cuisine:
@@ -278,13 +313,13 @@ def get_restaurant_suggestions(period: Dict) -> List[Dict]:
         print("  Restaurants : CACHE HIT")
         return cached
 
-    print("  Restaurants : CACHE MISS → Google Places API")
+    print("  Restaurants : CACHE MISS → Foursquare API")
 
-    # Récupérer les restaurants depuis Google
-    all_restaurants = _fetch_restaurants_from_google()
+    # Récupérer les restaurants depuis Foursquare
+    all_restaurants = _fetch_restaurants_from_foursquare()
 
     if not all_restaurants:
-        print("  ⚠ Aucun restaurant trouvé via Google Places")
+        print("  ⚠ Aucun restaurant trouvé via Foursquare")
         return []
 
     # Déduplication : récupérer les restaurants déjà visités
