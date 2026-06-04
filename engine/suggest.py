@@ -1,10 +1,11 @@
 import anthropic
 import json
 from concurrent.futures import ThreadPoolExecutor
-from datetime import datetime
+from datetime import date, datetime
 from typing import Dict, List
 
 from engine import calendar_engine, profile
+from engine.travel_engine import generate_travel_suggestions
 from collectors import weather, cinema, events, hiking, cycling, travel, concerts, exhibitions, discovery, restaurants
 
 
@@ -377,21 +378,32 @@ def generate_suggestions(period: Dict) -> Dict:
     profile_section = _build_profile_section()
 
     if is_vacation:
-        # Mode vacances : suggestions voyage
-        travel_data = travel.get_travel_suggestions(period)
-        user_prompt = _build_vacation_prompt(period, travel_data)
-        system_prompt = VACATION_BASE_PROMPT.format(profile_section=profile_section)
+        # Mode vacances : utiliser le travel_engine complet
+        user_profile = profile.get_profile()
+        stats = profile.get_activity_stats()
+        user_profile["trips_seen_recent"] = stats.get("trips_seen_recent", [])
 
-        # Données minimales pour le template
-        weather_data = {}
-        movies = []
-        events_list = []
-        hikes = []
-        cycling_list = []
-        concerts_list = []
-        exhibitions_list = []
-        discovery_list = []
-        restaurants_list = []
+        travel_result = generate_travel_suggestions(period, user_profile)
+
+        # Retourner directement le résultat du travel_engine
+        return {
+            "period": period,
+            "weather": {},
+            "movies": [],
+            "events": [],
+            "hikes": [],
+            "cycling": [],
+            "concerts": [],
+            "exhibitions": [],
+            "discovery": [],
+            "restaurants": [],
+            "travel": travel_result,
+            "is_vacation": True,
+            "suggestions": travel_result.get("suggestions", []),
+            "intro": f"✈️ {period.get('label', 'Vacances')} dans {(period['start'] - date.today()).days} jours",
+            "suggestions_text": None,
+            "generated_at": datetime.now()
+        }
     else:
         # Mode week-end : suggestions locales
         user_profile = profile.get_profile()

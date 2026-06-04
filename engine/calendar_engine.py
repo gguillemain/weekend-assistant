@@ -281,3 +281,35 @@ def get_next_period() -> Dict:
     """Retourne la prochaine période (pour affichage au démarrage)."""
     periods = get_next_periods(limit=1)
     return periods[0] if periods else None
+
+
+def get_upcoming_vacation(from_date: date = None) -> Dict:
+    """
+    Retourne les prochaines vacances si elles arrivent bientôt.
+
+    Returns:
+        Dict avec start, end, days, label ou None si pas de vacances proches
+    """
+    if from_date is None:
+        from_date = date.today()
+
+    threshold = from_date + timedelta(days=config.VACATION_SEND_DAYS_BEFORE)
+    vacations = _get_vacations(from_date)
+
+    for vacation in vacations:
+        if vacation["start"] <= threshold:
+            return vacation
+
+    return None
+
+
+def get_days_until_vacation(from_date: date = None) -> int:
+    """Retourne le nombre de jours avant les prochaines vacances."""
+    if from_date is None:
+        from_date = date.today()
+
+    vacation = get_upcoming_vacation(from_date)
+    if vacation:
+        return (vacation["start"] - from_date).days
+
+    return -1
