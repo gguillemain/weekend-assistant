@@ -90,7 +90,11 @@ def _migrate_activity_log(cursor):
 
     for col_name, col_type in new_columns:
         if col_name not in columns:
-            cursor.execute(f"ALTER TABLE activity_log ADD COLUMN {col_name} {col_type}")
+            try:
+                cursor.execute(f"ALTER TABLE activity_log ADD COLUMN {col_name} {col_type}")
+            except Exception:
+                # Colonne déjà ajoutée par un autre worker (race condition)
+                pass
 
 
 def _populate_initial_profile(cursor):
