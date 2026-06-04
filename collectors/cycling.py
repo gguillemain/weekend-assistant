@@ -57,9 +57,6 @@ def _scrape_alsaceavelo() -> List[Dict]:
         print(f"  ⚠ Erreur requête alsaceavelo.fr : {e}")
         return []
 
-    # Debug : afficher les 300 premiers caractères
-    print(f"  [DEBUG] HTML reçu (300 chars) : {response.text[:300]}...")
-
     soup = BeautifulSoup(response.text, "html.parser")
     rides = []
 
@@ -69,9 +66,6 @@ def _scrape_alsaceavelo() -> List[Dict]:
     if not cards:
         # Fallback : chercher tous les liens vers itinéraires
         cards = soup.select("a[href*='/itineraire'], a[href*='403']")
-        print(f"  [DEBUG] Fallback liens : {len(cards)} trouvés")
-
-    print(f"  [DEBUG] Cards trouvées : {len(cards)}")
 
     for card in cards:
         ride = _parse_ride_card(card)
@@ -158,8 +152,7 @@ def _parse_ride_card(card) -> Optional[Dict]:
             "bike_score": 0.0,
         }
 
-    except Exception as e:
-        print(f"  [DEBUG] Erreur parsing card : {e}")
+    except Exception:
         return None
 
 
