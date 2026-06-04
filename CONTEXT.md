@@ -33,7 +33,7 @@ weekend_assistant/
 │   ├── concerts.py           # Ticketmaster API FR/CH/DE, 180km (cache 6h)
 │   ├── exhibitions.py        # Scraping fondations/musées, 6 sources (cache 12h)
 │   ├── discovery.py          # Bons plans : DNA RSS, Tourisme Alsace, Freiburg (cache 4h)
-│   ├── restaurants.py        # Foursquare Places API, rayon 20km (cache 8h)
+│   ├── restaurants.py        # Liste statique Michelin/Gault&Millau (mise à jour annuelle)
 │   ├── openagenda.py         # API OpenAgenda (4 agendas Alsace)
 │   └── rss_reader.py         # Utilitaire parsing RSS/Atom
 │
@@ -62,7 +62,7 @@ weekend_assistant/
 | `concerts.py` | Ticketmaster API (FR/CH/DE) | Rayon 180km, déduplication, cache 6h |
 | `exhibitions.py` | 6 sources : Beyeler, Schneider, Fernet-Branca, Würth, Strasbourg, Kunstmuseum | profile_match, cache 12h |
 | `discovery.py` | DNA RSS (4 feeds), Tourisme Alsace, OpenAgenda, Freiburg | surprise_score, cache 4h |
-| `restaurants.py` | Foursquare Places API, rayon 20km | Mix 3 restos (bien noté, proche, cuisine variée), cache 8h |
+| `restaurants.py` | Liste Michelin/Gault&Millau | 20 restaurants Bib Gourmand/étoilés, scoring value_score |
 | `openagenda.py` | API OpenAgenda | 4 agendas : Haut-Rhin, Alsace, Mulhouse, Colmar |
 | `cache.py` | Cache SQLite avec TTL | HIT x2600 plus rapide (44s → 17ms) |
 | `suggest.py` | Génération suggestions via Claude API | JSON structuré, tous collectors intégrés |
@@ -145,16 +145,27 @@ curl -X DELETE http://127.0.0.1:5000/cache-clear?mode=expired
 | Musées de Strasbourg | Strasbourg | 100km |
 | Kunstmuseum Basel | Bâle | 45km |
 
-### restaurants.py (1 source)
+### restaurants.py (liste statique)
 
-| Source | Type | Rayon |
-|--------|------|-------|
-| Foursquare Places API | API | 20km |
+| Source | Type | Mise à jour |
+|--------|------|-------------|
+| Guide Michelin | Liste statique | Annuelle (mars) |
+| Gault & Millau | Liste statique | Annuelle (mars) |
 
-**Stratégie de sélection** : Mix de 3 restaurants
-1. Un restaurant bien noté (>4.0, populaire)
-2. Un restaurant proche (<10km)
-3. Un restaurant de cuisine différente
+**Liste BIB_GOURMAND_ALSACE** : 20 restaurants
+- Bib Gourmand (13) : L'Aigle d'Or, L'Arbre Vert, Perle des Vosges, etc.
+- 1 étoile Michelin (1) : L'Atelier du Peintre (Colmar)
+- Recommandés G&M (6) : Wistub Brenner, Le Gavroche, Chez Donati, etc.
+
+**Scoring value_score** (0-1) :
+- Bib Gourmand : +0.4
+- Étoile Michelin : +0.3
+- Recommandé : +0.2
+- Prix € : +0.2, €€ : +0.1
+- Distance <15km : +0.3, <30km : +0.2, <50km : +0.1
+- Cuisine winstub/alsacienne : +0.1
+
+**Top attendu** : L'AO – L'Aigle d'Or (Rimbach, 5km) avec score ~0.8
 
 **Déduplication** : Restaurants vus exclus pendant 90 jours.
 
@@ -193,7 +204,7 @@ curl -X DELETE http://127.0.0.1:5000/cache-clear?mode=expired
 - [x] Cache SQLite (x2600 plus rapide)
 - [x] Sources Discovery + OpenAgenda
 - [x] Sources allemandes (Freiburg)
-- [x] Restaurants Foursquare API
+- [x] Restaurants liste Michelin/Gault&Millau
 
 ### Phase 6 - Améliorations
 - [ ] Visorando : notes, photos, GPX
@@ -215,7 +226,7 @@ ANTHROPIC_API_KEY=sk-ant-...
 OPENWEATHER_API_KEY=...
 FLASK_SECRET_KEY=...
 TICKETMASTER_API_KEY=...  # developer.ticketmaster.com
-FOURSQUARE_API_KEY=...    # developer.foursquare.com
+# FOURSQUARE_API_KEY plus nécessaire (liste statique restaurants)
 
 # Configuration SMTP
 SMTP_HOST=smtp.gmail.com
@@ -311,5 +322,5 @@ expo_fondations: [
 
 ---
 
-*Dernière mise à jour : 03/06/2026*
-*Commits : ba235c2 (MVP) → 15878cd (cache SQLite) → 4220b28 (Freiburg) → 04014ce (restaurants Foursquare)*
+*Dernière mise à jour : 04/06/2026*
+*Commits : ba235c2 (MVP) → 15878cd (cache SQLite) → 4220b28 (Freiburg) → 9b6d0b6 (restaurants Michelin)*

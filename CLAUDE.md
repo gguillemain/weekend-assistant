@@ -16,7 +16,7 @@ weekend_assistant/
 │   ├── exhibitions.py     # Expositions (scraping musées)
 │   ├── events.py          # Événements locaux (JDS, Strasbourg.eu)
 │   ├── hiking.py          # Randonnées (Visorando scraping)
-│   ├── restaurants.py     # Restaurants (Foursquare API)
+│   ├── restaurants.py     # Restaurants (liste Michelin/Gault&Millau)
 │   ├── discovery.py       # Découvertes diverses
 │   └── weather.py         # Météo (API OpenWeatherMap)
 ├── engine/
@@ -139,8 +139,9 @@ Les collectors utilisent `get_seen_items_normalized()` pour éviter de re-suggé
 ```
 OPENWEATHERMAP_API_KEY=...
 TICKETMASTER_API_KEY=...
-FOURSQUARE_API_KEY=...
 ```
+
+Note : Les restaurants utilisent une liste statique (pas d'API).
 
 ## Développement local
 
