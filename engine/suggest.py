@@ -125,12 +125,13 @@ def _build_profile_section() -> str:
         lines.append("Commence tes suggestions par une phrase de motivation douce mais directe,")
         lines.append("sans culpabiliser, pour les encourager à sortir.")
 
-    # Historique récent (films, concerts, expos)
+    # Historique récent (films, concerts, expos, restaurants)
     films_recent = stats.get("films_seen_recent", [])
     concerts_recent = stats.get("concerts_seen_recent", [])
     expos_recent = stats.get("expos_seen_recent", [])
+    restaurants_recent = stats.get("restaurants_seen_recent", [])
 
-    if films_recent or concerts_recent or expos_recent:
+    if films_recent or concerts_recent or expos_recent or restaurants_recent:
         lines.append("")
         lines.append("Historique récent :")
         if films_recent:
@@ -140,6 +141,9 @@ def _build_profile_section() -> str:
             lines.append(f"Concerts récents : {', '.join(concerts_recent)}")
         if expos_recent:
             lines.append(f"Expos récentes : {', '.join(expos_recent)}")
+        if restaurants_recent:
+            lines.append(f"Restaurants récents : {', '.join(restaurants_recent)}")
+            lines.append("→ Ne pas reproposer ces restaurants.")
 
     return "\n".join(lines)
 
@@ -398,6 +402,17 @@ def generate_suggestions(period: Dict) -> Dict:
         user_prompt = _build_user_prompt(period, weather_data, movies, events_list, hikes, concerts_list, exhibitions_list, discovery_list, restaurants_list)
         system_prompt = BASE_SYSTEM_PROMPT.format(profile_section=profile_section)
         travel_data = {}
+
+    # DEBUG : Afficher le prompt complet envoyé à Claude
+    print("\n" + "="*80)
+    print("DEBUG — PROMPT SYSTÈME ENVOYÉ À CLAUDE :")
+    print("="*80)
+    print(system_prompt)
+    print("\n" + "="*80)
+    print("DEBUG — PROMPT UTILISATEUR ENVOYÉ À CLAUDE :")
+    print("="*80)
+    print(user_prompt[:3000] + "..." if len(user_prompt) > 3000 else user_prompt)
+    print("="*80 + "\n")
 
     # Appeler Claude API
     client = anthropic.Anthropic()

@@ -374,9 +374,22 @@ def get_restaurant_suggestions(period: Dict, profile: Dict = None) -> List[Dict]
         return []
 
     # Déduplication avec historique utilisateur
-    from engine.profile import get_seen_items_normalized
+    from engine.profile import get_seen_items_normalized, normalize_for_matching
     seen_restaurants = get_seen_items_normalized('restaurants', days=90)
-    available = [r for r in all_restaurants if r["title"].lower() not in seen_restaurants]
+
+    def is_seen(title: str) -> bool:
+        """Vérifie si un restaurant a été vu (matching partiel)."""
+        normalized = normalize_for_matching(title)
+        # Match exact
+        if normalized in seen_restaurants:
+            return True
+        # Match partiel : "l aigle d or" dans "l ao l aigle d or"
+        for seen in seen_restaurants:
+            if seen in normalized or normalized in seen:
+                return True
+        return False
+
+    available = [r for r in all_restaurants if not is_seen(r["title"])]
 
     if not available:
         available = all_restaurants  # Fallback si tous vus

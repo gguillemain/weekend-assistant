@@ -338,6 +338,22 @@ def get_activity_stats() -> Dict[str, Any]:
             pass
     hiking_seen_recent = hiking_seen_recent[:5]
 
+    # Restaurants récents (5 derniers)
+    cursor.execute("""
+        SELECT restaurants_seen FROM activity_log
+        WHERE restaurants_seen IS NOT NULL
+        ORDER BY created_at DESC
+        LIMIT 10
+    """)
+    restaurants_seen_recent = []
+    for row in cursor.fetchall():
+        try:
+            restos = json.loads(row["restaurants_seen"])
+            restaurants_seen_recent.extend(restos)
+        except (json.JSONDecodeError, TypeError):
+            pass
+    restaurants_seen_recent = restaurants_seen_recent[:5]
+
     conn.close()
 
     return {
@@ -348,7 +364,8 @@ def get_activity_stats() -> Dict[str, Any]:
         "films_seen_recent": films_seen_recent,
         "concerts_seen_recent": concerts_seen_recent,
         "expos_seen_recent": expos_seen_recent,
-        "hiking_seen_recent": hiking_seen_recent
+        "hiking_seen_recent": hiking_seen_recent,
+        "restaurants_seen_recent": restaurants_seen_recent
     }
 
 
