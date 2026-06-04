@@ -331,22 +331,14 @@ def get_hiking_suggestions(period: Dict, weather_data: Optional[Dict] = None) ->
     cached = cache_get(cache_key)
     if cached:
         print("  Randonnées : CACHE HIT")
-        # Recalculer le weather_score avec les nouvelles données météo
-        best_weather_day = None
-        if weather_data and weather_data.get("days"):
-            days = weather_data["days"]
-            suitable_days = [d for d in days if d.get("suitable_outdoor", False)]
-            if suitable_days:
-                best_weather_day = suitable_days[0]
-            elif days:
-                best_weather_day = days[0]
-        for hike in cached:
-            hike["weather_score"] = _calculate_weather_score(hike, best_weather_day)
-        return cached
+        hikes = cached
+    else:
+        print("  Randonnées : CACHE MISS → scraping Visorando")
+        hikes = _scrape_visorando()
 
-    print("  Randonnées : CACHE MISS → scraping Visorando")
-
-    hikes = _scrape_visorando()
+        if hikes:
+            # Mettre en cache les données BRUTES (avant déduplication)
+            cache_set(cache_key, hikes, CACHE_TTL.get("hiking", 1440))
 
     if not hikes:
         print("  ⚠ Aucune randonnée trouvée sur Visorando")
@@ -355,7 +347,6 @@ def get_hiking_suggestions(period: Dict, weather_data: Optional[Dict] = None) ->
     # Calculer le weather_score pour chaque randonnée
     best_weather_day = None
     if weather_data and weather_data.get("days"):
-        # Trouver le meilleur jour météo
         days = weather_data["days"]
         suitable_days = [d for d in days if d.get("suitable_outdoor", False)]
         if suitable_days:
@@ -366,7 +357,7 @@ def get_hiking_suggestions(period: Dict, weather_data: Optional[Dict] = None) ->
     for hike in hikes:
         hike["weather_score"] = _calculate_weather_score(hike, best_weather_day)
 
-    # Déduplication : filtrer les randonnées déjà faites (90 jours)
+    # Déduplication TOUJOURS appliquée (cache ou pas)
     from engine.profile import get_seen_items_normalized, normalize_for_matching
 
     seen_hikes = get_seen_items_normalized('hiking', days=90)
@@ -374,10 +365,8 @@ def get_hiking_suggestions(period: Dict, weather_data: Optional[Dict] = None) ->
     def is_hike_seen(title: str) -> bool:
         """Vérifie si une rando a été faite (matching partiel)."""
         normalized = normalize_for_matching(title)
-        # Match exact
         if normalized in seen_hikes:
             return True
-        # Match partiel : "lac d alfeld" dans "de sewen au lac d alfeld"
         for seen in seen_hikes:
             if seen in normalized or normalized in seen:
                 return True
@@ -397,15 +386,12 @@ def get_hiking_suggestions(period: Dict, weather_data: Optional[Dict] = None) ->
         score = (h.get("rating", 0) or 0) * 0.4
         score += h.get("weather_score", 0) * 0.3
         score += 0.2 if h.get("loop", False) else 0
-        score -= h.get("distance_from_home", 50) * 0.005  # Pénalité distance
+        score -= h.get("distance_from_home", 50) * 0.005
         return -score
 
     hikes.sort(key=sort_key)
 
-    print(f"  Randonnées : {len(hikes)} trouvées")
-
-    # Mettre en cache
-    cache_set(cache_key, hikes, CACHE_TTL.get("hiking", 1440))
+    print(f"  Randonnées : {len(hikes)} après déduplication")
 
     return hikes
 

@@ -417,63 +417,88 @@ def get_artetal_movies(period: Dict) -> List[Dict]:
     cached = cache_get(cache_key)
     if cached:
         print("  Cinéma : CACHE HIT")
-        return cached
+        filtered_movies = cached
+    else:
+        print("  Cinéma : CACHE MISS → scraping")
 
-    print("  Cinéma : CACHE MISS → scraping")
+        # Récupérer les recommandations éditoriales
+        fetch_telerama_picks()
+        fetch_cahiers_picks()
 
-    # Récupérer les recommandations éditoriales
-    fetch_telerama_picks()
-    fetch_cahiers_picks()
+        # Afficher le statut des sources
+        _print_sources_status()
 
-    # Afficher le statut des sources
-    _print_sources_status()
+        all_movies = []
 
-    all_movies = []
+        for cinema in CINEMAS:
+            try:
+                movies = _scrape_cinema(cinema, period_start, period_end)
+                all_movies.extend(movies)
+            except Exception as e:
+                print(f"⚠ Erreur scraping {cinema['name']}: {e}")
+                continue
 
-    for cinema in CINEMAS:
-        try:
-            movies = _scrape_cinema(cinema, period_start, period_end)
-            all_movies.extend(movies)
-        except Exception as e:
-            print(f"⚠ Erreur scraping {cinema['name']}: {e}")
-            continue
+            time.sleep(0.5)
 
-        time.sleep(0.5)
+        # Ajouter les infos éditoriales à chaque film
+        for movie in all_movies:
+            is_telerama, stars = get_telerama_info(movie["title"])
+            movie["telerama_pick"] = is_telerama
+            movie["telerama_stars"] = stars
+            movie["cahiers_pick"] = get_cahiers_info(movie["title"])
 
-    # Ajouter les infos éditoriales à chaque film
-    for movie in all_movies:
-        is_telerama, stars = get_telerama_info(movie["title"])
-        movie["telerama_pick"] = is_telerama
-        movie["telerama_stars"] = stars
-        movie["cahiers_pick"] = get_cahiers_info(movie["title"])
+        # Filtrer les films intéressants
+        filtered_movies = [
+            m for m in all_movies
+            if m["telerama_pick"] or m["cahiers_pick"] or m["art_et_essai"] or (m["press_rating"] and m["press_rating"] >= 3.5)
+        ]
 
-    # Filtrer les films intéressants
-    filtered_movies = [
-        m for m in all_movies
-        if m["telerama_pick"] or m["cahiers_pick"] or m["art_et_essai"] or (m["press_rating"] and m["press_rating"] >= 3.5)
-    ]
+        # Tri multi-critères
+        def sort_key(movie):
+            priority = 0
+            if movie["telerama_pick"] and movie["cahiers_pick"]:
+                priority = 2000 + (movie["telerama_stars"] or 0) * 100 + (movie["press_rating"] or 0) * 10
+            elif movie["telerama_pick"]:
+                priority = 1500 + (movie["telerama_stars"] or 0) * 100 + (movie["press_rating"] or 0) * 10
+            elif movie["cahiers_pick"]:
+                priority = 1000 + (movie["press_rating"] or 0) * 10
+            elif movie["art_et_essai"] and movie["press_rating"] and movie["press_rating"] >= 3.5:
+                priority = 500 + (movie["press_rating"] or 0) * 10
+            else:
+                priority = (movie["press_rating"] or 0) * 10
+            return -priority
 
-    # Tri multi-critères
-    def sort_key(movie):
-        priority = 0
-        if movie["telerama_pick"] and movie["cahiers_pick"]:
-            priority = 2000 + (movie["telerama_stars"] or 0) * 100 + (movie["press_rating"] or 0) * 10
-        elif movie["telerama_pick"]:
-            priority = 1500 + (movie["telerama_stars"] or 0) * 100 + (movie["press_rating"] or 0) * 10
-        elif movie["cahiers_pick"]:
-            priority = 1000 + (movie["press_rating"] or 0) * 10
-        elif movie["art_et_essai"] and movie["press_rating"] and movie["press_rating"] >= 3.5:
-            priority = 500 + (movie["press_rating"] or 0) * 10
+        filtered_movies.sort(key=sort_key)
+
+        # Mettre en cache les données AVANT déduplication
+        if filtered_movies:
+            cache_set(cache_key, filtered_movies, CACHE_TTL.get("cinema", 360))
+
+    # Déduplication TOUJOURS appliquée (cache ou pas)
+    from engine.profile import get_seen_items_normalized, normalize_for_matching
+
+    seen_films = get_seen_items_normalized('films', days=365)
+
+    def is_film_seen(title: str) -> bool:
+        """Vérifie si un film a été vu (matching partiel)."""
+        normalized = normalize_for_matching(title)
+        if normalized in seen_films:
+            return True
+        for seen in seen_films:
+            if seen in normalized or normalized in seen:
+                return True
+        return False
+
+    deduplicated = []
+    for movie in filtered_movies:
+        if not is_film_seen(movie["title"]):
+            deduplicated.append(movie)
         else:
-            priority = (movie["press_rating"] or 0) * 10
-        return -priority
+            print(f"  [SKIP] Film déjà vu : {movie['title']}")
 
-    filtered_movies.sort(key=sort_key)
+    print(f"  Cinéma : {len(deduplicated)} films après déduplication")
 
-    # Mettre en cache
-    cache_set(cache_key, filtered_movies, CACHE_TTL.get("cinema", 360))
-
-    return filtered_movies
+    return deduplicated
 
 
 def _print_sources_status():

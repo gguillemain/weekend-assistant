@@ -40,6 +40,111 @@ EXCLUDED_KEYWORDS = ["vtt", "gravel", "mountainbike", "mountain bike"]
 
 
 # =============================================================================
+# LISTE STATIQUE — ITINÉRAIRES LOCAUX CONNUS
+# =============================================================================
+
+LOCAL_BIKE_ROUTES = [
+    {
+        "title": "Voie verte Vallée de la Doller",
+        "start_city": "Burnhaupt-le-Bas",
+        "end_city": "Sentheim",
+        "distance_km": 18,      # aller-retour ~36km
+        "elevation_gain": 40,
+        "terrain": "vallée",
+        "surface": "voie verte",
+        "loop": False,
+        "difficulty": "Familial",
+        "url": "https://www.alsaceavelo.fr"
+    },
+    {
+        "title": "Véloroute du vignoble — Guebwiller à Colmar",
+        "start_city": "Guebwiller",
+        "end_city": "Colmar",
+        "distance_km": 25,      # aller-retour ~50km
+        "elevation_gain": 80,
+        "terrain": "vignoble",
+        "surface": "cyclable",
+        "loop": False,
+        "difficulty": "Familial",
+        "url": "https://www.alsaceavelo.fr/itineraires/velo-route-du-vignoble"
+    },
+    {
+        "title": "EuroVelo 15 — Neuf-Brisach à Bâle",
+        "start_city": "Neuf-Brisach",
+        "distance_km": 62,
+        "elevation_gain": 30,
+        "terrain": "rhin",
+        "surface": "cyclable",
+        "loop": False,
+        "difficulty": "Familial",
+        "url": "https://www.alsaceavelo.fr/itineraires/eurovelo-15"
+    },
+    {
+        "title": "Boucle des Trois Châteaux — Eguisheim",
+        "start_city": "Eguisheim",
+        "distance_km": 35,
+        "elevation_gain": 150,
+        "terrain": "vignoble",
+        "surface": "mixte",
+        "loop": True,
+        "difficulty": "Intermédiaire",
+        "url": "https://www.alsaceavelo.fr"
+    },
+    {
+        "title": "Canal du Rhône au Rhin — Mulhouse à Niffer",
+        "start_city": "Mulhouse",
+        "distance_km": 40,
+        "elevation_gain": 20,
+        "terrain": "rhin",
+        "surface": "voie verte",
+        "loop": False,
+        "difficulty": "Familial",
+        "url": "https://www.alsaceavelo.fr"
+    }
+]
+
+
+# =============================================================================
+# CONVERSION LISTE STATIQUE
+# =============================================================================
+
+def _convert_local_route(route: Dict) -> Dict:
+    """Convertit une entrée LOCAL_BIKE_ROUTES au format complet."""
+    title = route["title"]
+    distance_km = route["distance_km"]
+
+    # Pour les aller-retours, doubler la distance
+    if not route.get("loop", False) and "aller" not in title.lower():
+        # Aller-retour implicite
+        distance_km = distance_km * 2 if distance_km < 30 else distance_km
+
+    # Ville de départ
+    start_city = route.get("start_city", "Alsace")
+    distance_from_home = _get_distance_from_home(start_city)
+
+    # Durée estimée (15 km/h VAE)
+    duration_h = round(distance_km / 15, 1)
+
+    return {
+        "title": title,
+        "distance_km": distance_km,
+        "elevation_gain": route.get("elevation_gain", 0),
+        "duration_h": duration_h,
+        "difficulty": route.get("difficulty", "Familial"),
+        "start_city": start_city,
+        "distance_from_home": distance_from_home,
+        "terrain": route.get("terrain", "mixte"),
+        "surface": route.get("surface", "cyclable"),
+        "loop": route.get("loop", False),
+        "url": route.get("url", "https://www.alsaceavelo.fr"),
+        "ride_type": "Local connu",
+        "weather_score": 0.0,
+        "bike_score": 0.0,
+        "source": "local",
+    }
+
+
+# =============================================================================
 # SCRAPING ALSACEAVELO.FR
 # =============================================================================
 
@@ -369,6 +474,17 @@ def get_cycling_suggestions(period: Dict, weather_data: Dict = None) -> List[Dic
         if rides:
             # Cache 48h
             cache_set(cache_key, rides, CACHE_TTL.get("cycling", 2880))
+
+    # Fusionner avec LOCAL_BIKE_ROUTES
+    local_rides = [_convert_local_route(r) for r in LOCAL_BIKE_ROUTES]
+
+    # Éviter les doublons (même titre normalisé)
+    existing_titles = {r["title"].lower().strip() for r in rides}
+    for local in local_rides:
+        if local["title"].lower().strip() not in existing_titles:
+            rides.append(local)
+
+    print(f"  Vélo : {len(rides)} itinéraires (scraping + {len(local_rides)} locaux)")
 
     if not rides:
         print("  ⚠ Aucun itinéraire vélo trouvé")
