@@ -140,8 +140,10 @@ def _build_profile_section() -> str:
             lines.append("→ Ne pas reproposer ces films.")
         if concerts_recent:
             lines.append(f"Concerts récents : {', '.join(concerts_recent)}")
+            lines.append("→ Ne pas reproposer ces concerts.")
         if expos_recent:
             lines.append(f"Expos récentes : {', '.join(expos_recent)}")
+            lines.append("→ Ne pas reproposer ces expositions.")
         if hiking_recent:
             lines.append(f"Randonnées récentes : {', '.join(hiking_recent)}")
             lines.append("→ Ne pas reproposer ces randonnées.")
