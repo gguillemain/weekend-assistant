@@ -371,11 +371,21 @@ def get_hiking_suggestions(period: Dict, weather_data: Optional[Dict] = None) ->
 
     seen_hikes = get_seen_items_normalized('hiking', days=90)
 
+    def is_hike_seen(title: str) -> bool:
+        """Vérifie si une rando a été faite (matching partiel)."""
+        normalized = normalize_for_matching(title)
+        # Match exact
+        if normalized in seen_hikes:
+            return True
+        # Match partiel : "lac d alfeld" dans "de sewen au lac d alfeld"
+        for seen in seen_hikes:
+            if seen in normalized or normalized in seen:
+                return True
+        return False
+
     deduplicated = []
     for hike in hikes:
-        hike_normalized = normalize_for_matching(hike["title"])
-
-        if hike_normalized not in seen_hikes:
+        if not is_hike_seen(hike["title"]):
             deduplicated.append(hike)
         else:
             print(f"  [SKIP] Rando déjà faite : {hike['title']}")

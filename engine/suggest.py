@@ -125,13 +125,14 @@ def _build_profile_section() -> str:
         lines.append("Commence tes suggestions par une phrase de motivation douce mais directe,")
         lines.append("sans culpabiliser, pour les encourager à sortir.")
 
-    # Historique récent (films, concerts, expos, restaurants)
+    # Historique récent (films, concerts, expos, randos, restaurants)
     films_recent = stats.get("films_seen_recent", [])
     concerts_recent = stats.get("concerts_seen_recent", [])
     expos_recent = stats.get("expos_seen_recent", [])
+    hiking_recent = stats.get("hiking_seen_recent", [])
     restaurants_recent = stats.get("restaurants_seen_recent", [])
 
-    if films_recent or concerts_recent or expos_recent or restaurants_recent:
+    if films_recent or concerts_recent or expos_recent or hiking_recent or restaurants_recent:
         lines.append("")
         lines.append("Historique récent :")
         if films_recent:
@@ -141,6 +142,9 @@ def _build_profile_section() -> str:
             lines.append(f"Concerts récents : {', '.join(concerts_recent)}")
         if expos_recent:
             lines.append(f"Expos récentes : {', '.join(expos_recent)}")
+        if hiking_recent:
+            lines.append(f"Randonnées récentes : {', '.join(hiking_recent)}")
+            lines.append("→ Ne pas reproposer ces randonnées.")
         if restaurants_recent:
             lines.append(f"Restaurants récents : {', '.join(restaurants_recent)}")
             lines.append("→ Ne pas reproposer ces restaurants.")
