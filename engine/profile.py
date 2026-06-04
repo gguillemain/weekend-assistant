@@ -43,6 +43,7 @@ def get_seen_items_normalized(activity_type: str, days: int = 180) -> set:
         'concerts': 'concerts_seen',
         'expos': 'expos_seen',
         'hiking': 'hiking_seen',
+        'cycling': 'cycling_seen',
         'restaurants': 'restaurants_seen'
     }
 
@@ -127,6 +128,7 @@ def log_activity(
     concerts_seen: List[str] = None,
     expos_seen: List[str] = None,
     hiking_seen: List[str] = None,
+    cycling_seen: List[str] = None,
     restaurants_seen: List[str] = None,
     stayed_home_reason: str = None
 ) -> None:
@@ -141,6 +143,7 @@ def log_activity(
         concerts_seen: Liste "Artiste - Lieu"
         expos_seen: Liste "Expo - Lieu"
         hiking_seen: Liste "Nom rando (DD/MM/YYYY)"
+        cycling_seen: Liste "Nom itinéraire vélo"
         restaurants_seen: Liste "Nom resto - Ville"
         stayed_home_reason: Raison si resté à la maison (repos, travaux, météo, autre)
     """
@@ -160,9 +163,9 @@ def log_activity(
     cursor.execute("""
         INSERT INTO activity_log (
             period_start, period_end, period_label, category, note,
-            films_seen, concerts_seen, expos_seen, hiking_seen, restaurants_seen, stayed_home_reason
+            films_seen, concerts_seen, expos_seen, hiking_seen, cycling_seen, restaurants_seen, stayed_home_reason
         )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     """, (
         period_start.isoformat() if period_start else None,
         period_end.isoformat() if period_end else None,
@@ -173,6 +176,7 @@ def log_activity(
         json.dumps(concerts_seen, ensure_ascii=False) if concerts_seen else None,
         json.dumps(expos_seen, ensure_ascii=False) if expos_seen else None,
         json.dumps(hiking_seen, ensure_ascii=False) if hiking_seen else None,
+        json.dumps(cycling_seen, ensure_ascii=False) if cycling_seen else None,
         json.dumps(restaurants_seen, ensure_ascii=False) if restaurants_seen else None,
         stayed_home_reason
     ))
@@ -338,6 +342,22 @@ def get_activity_stats() -> Dict[str, Any]:
             pass
     hiking_seen_recent = hiking_seen_recent[:5]
 
+    # Sorties vélo récentes (5 dernières)
+    cursor.execute("""
+        SELECT cycling_seen FROM activity_log
+        WHERE cycling_seen IS NOT NULL
+        ORDER BY created_at DESC
+        LIMIT 10
+    """)
+    cycling_seen_recent = []
+    for row in cursor.fetchall():
+        try:
+            rides = json.loads(row["cycling_seen"])
+            cycling_seen_recent.extend(rides)
+        except (json.JSONDecodeError, TypeError):
+            pass
+    cycling_seen_recent = cycling_seen_recent[:5]
+
     # Restaurants récents (5 derniers)
     cursor.execute("""
         SELECT restaurants_seen FROM activity_log
@@ -365,6 +385,7 @@ def get_activity_stats() -> Dict[str, Any]:
         "concerts_seen_recent": concerts_seen_recent,
         "expos_seen_recent": expos_seen_recent,
         "hiking_seen_recent": hiking_seen_recent,
+        "cycling_seen_recent": cycling_seen_recent,
         "restaurants_seen_recent": restaurants_seen_recent
     }
 
@@ -411,7 +432,7 @@ def get_full_activity_history(limit: int = 50) -> Dict:
     cursor.execute("""
         SELECT
             id, period_label, period_start, period_end, category, note,
-            films_seen, concerts_seen, expos_seen, hiking_seen, restaurants_seen, stayed_home_reason, created_at
+            films_seen, concerts_seen, expos_seen, hiking_seen, cycling_seen, restaurants_seen, stayed_home_reason, created_at
         FROM activity_log
         ORDER BY period_start DESC
         LIMIT ?
@@ -422,7 +443,7 @@ def get_full_activity_history(limit: int = 50) -> Dict:
         activity = dict(row)
 
         # Désérialiser JSON fields
-        for field in ['films_seen', 'concerts_seen', 'expos_seen', 'hiking_seen', 'restaurants_seen']:
+        for field in ['films_seen', 'concerts_seen', 'expos_seen', 'hiking_seen', 'cycling_seen', 'restaurants_seen']:
             if activity[field]:
                 try:
                     activity[field] = json.loads(activity[field])

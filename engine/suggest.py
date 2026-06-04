@@ -5,7 +5,7 @@ from datetime import datetime
 from typing import Dict, List
 
 from engine import calendar_engine, profile
-from collectors import weather, cinema, events, hiking, travel, concerts, exhibitions, discovery, restaurants
+from collectors import weather, cinema, events, hiking, cycling, travel, concerts, exhibitions, discovery, restaurants
 
 
 BASE_SYSTEM_PROMPT = """Tu es un assistant personnel de loisirs pour un couple
@@ -57,6 +57,11 @@ Pour les suggestions de randonnée, utilise UNIQUEMENT
 les données Visorando fournies. Ne jamais inventer
 de randonnée. Si aucune donnée n'est disponible,
 ne propose pas de randonnée.
+
+Pour les suggestions vélo, c'est un VAE sur voies sécurisées
+(pas VTT, pas Gravel). Distance idéale 45-60km.
+Privilégie les itinéraires vignoble ou bord du Rhin par beau temps.
+Ne jamais reproposer un itinéraire déjà fait (cycling_seen_recent).
 
 {profile_section}
 
@@ -125,14 +130,15 @@ def _build_profile_section() -> str:
         lines.append("Commence tes suggestions par une phrase de motivation douce mais directe,")
         lines.append("sans culpabiliser, pour les encourager à sortir.")
 
-    # Historique récent (films, concerts, expos, randos, restaurants)
+    # Historique récent (films, concerts, expos, randos, vélo, restaurants)
     films_recent = stats.get("films_seen_recent", [])
     concerts_recent = stats.get("concerts_seen_recent", [])
     expos_recent = stats.get("expos_seen_recent", [])
     hiking_recent = stats.get("hiking_seen_recent", [])
+    cycling_recent = stats.get("cycling_seen_recent", [])
     restaurants_recent = stats.get("restaurants_seen_recent", [])
 
-    if films_recent or concerts_recent or expos_recent or hiking_recent or restaurants_recent:
+    if films_recent or concerts_recent or expos_recent or hiking_recent or cycling_recent or restaurants_recent:
         lines.append("")
         lines.append("Historique récent :")
         if films_recent:
@@ -147,6 +153,9 @@ def _build_profile_section() -> str:
         if hiking_recent:
             lines.append(f"Randonnées récentes : {', '.join(hiking_recent)}")
             lines.append("→ Ne pas reproposer ces randonnées.")
+        if cycling_recent:
+            lines.append(f"Sorties vélo récentes : {', '.join(cycling_recent)}")
+            lines.append("→ Ne pas reproposer ces itinéraires.")
         if restaurants_recent:
             lines.append(f"Restaurants récents : {', '.join(restaurants_recent)}")
             lines.append("→ Ne pas reproposer ces restaurants.")
@@ -293,7 +302,7 @@ Mélange city breaks proches et destinations plus lointaines si la durée le per
 {request}"""
 
 
-def _build_user_prompt(period: Dict, weather_data: Dict, movies: List[Dict], events_list: List[Dict], hikes: List[Dict], concerts_list: List[Dict] = None, exhibitions_list: List[Dict] = None, discovery_list: List[Dict] = None, restaurants_list: List[Dict] = None) -> str:
+def _build_user_prompt(period: Dict, weather_data: Dict, movies: List[Dict], events_list: List[Dict], hikes: List[Dict], cycling_list: List[Dict] = None, concerts_list: List[Dict] = None, exhibitions_list: List[Dict] = None, discovery_list: List[Dict] = None, restaurants_list: List[Dict] = None) -> str:
     """Construit le prompt utilisateur complet."""
     period_info = f"""Période : {period['label']}
 Dates : du {period['start'].strftime('%d/%m/%Y')} au {period['end'].strftime('%d/%m/%Y')}
@@ -304,6 +313,7 @@ Mode : {period['mode']}"""
     movies_context = _format_movies_context(movies)
     events_context = _format_events_context(events_list)
     hiking_context = _format_hiking_context(hikes)
+    cycling_context = cycling.format_cycling_context(cycling_list) if cycling_list else ""
     concerts_context = concerts.format_concerts_context(concerts_list) if concerts_list else ""
     exhibitions_context = exhibitions.format_exhibitions_context(exhibitions_list) if exhibitions_list else ""
     discovery_context = discovery.format_discovery_context(discovery_list) if discovery_list else ""
@@ -329,9 +339,9 @@ Réponds UNIQUEMENT en JSON valide avec ce format exact :
 Valeurs possibles :
 - day : "Samedi", "Dimanche", "Lundi", "Flexible"
 - logistics : "Spontané", "À réserver", "À planifier"
-- type : "cinema", "rando", "culture", "exposition", "gastronomie", "concert", "découverte", "autre"
+- type : "cinema", "rando", "vélo", "culture", "exposition", "gastronomie", "concert", "découverte", "autre"
 
-Privilégie la variété : mélange cinéma, randonnée, exposition, concert, découverte si possible."""
+Privilégie la variété : mélange cinéma, randonnée, vélo, exposition, concert, découverte si possible."""
 
     return f"""{period_info}
 
@@ -342,6 +352,8 @@ Privilégie la variété : mélange cinéma, randonnée, exposition, concert, d�
 {events_context}
 
 {hiking_context}
+
+{cycling_context}
 
 {concerts_context}
 
@@ -375,6 +387,7 @@ def generate_suggestions(period: Dict) -> Dict:
         movies = []
         events_list = []
         hikes = []
+        cycling_list = []
         concerts_list = []
         exhibitions_list = []
         discovery_list = []
@@ -384,7 +397,7 @@ def generate_suggestions(period: Dict) -> Dict:
         user_profile = profile.get_profile()
 
         # Paralléliser les appels API (gain de temps significatif)
-        with ThreadPoolExecutor(max_workers=7) as executor:
+        with ThreadPoolExecutor(max_workers=8) as executor:
             future_weather = executor.submit(weather.get_weather_forecast, period)
             future_movies = executor.submit(cinema.get_artetal_movies, period)
             future_events = executor.submit(events.get_local_events, period)
@@ -402,10 +415,11 @@ def generate_suggestions(period: Dict) -> Dict:
             discovery_list = future_discovery.result()
             restaurants_list = future_restaurants.result()
 
-        # Hikes dépend de weather_data, exécuté après
+        # Hikes et cycling dépendent de weather_data, exécutés après
         hikes = hiking.get_hiking_suggestions(period, weather_data)
+        cycling_list = cycling.get_cycling_suggestions(period, weather_data)
 
-        user_prompt = _build_user_prompt(period, weather_data, movies, events_list, hikes, concerts_list, exhibitions_list, discovery_list, restaurants_list)
+        user_prompt = _build_user_prompt(period, weather_data, movies, events_list, hikes, cycling_list, concerts_list, exhibitions_list, discovery_list, restaurants_list)
         system_prompt = BASE_SYSTEM_PROMPT.format(profile_section=profile_section)
         travel_data = {}
 
@@ -455,6 +469,7 @@ def generate_suggestions(period: Dict) -> Dict:
         "movies": movies[:5] if movies else [],
         "events": events_list[:8] if events_list else [],
         "hikes": hikes[:3] if hikes else [],
+        "cycling": cycling_list[:3] if cycling_list else [],
         "concerts": concerts_list[:5] if concerts_list else [],
         "exhibitions": exhibitions_list[:4] if exhibitions_list else [],
         "discovery": discovery_list[:4] if discovery_list else [],

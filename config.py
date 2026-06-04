@@ -34,6 +34,30 @@ HIKING_PREFS = {
     "difficulty": ["Facile", "Moyen"]
 }
 
+BIKE_PREFS = {
+    "min_distance_km": 40,
+    "max_distance_km": 65,
+    "max_drive_km": 80,
+    "allow_vtt": False,
+    "allow_gravel": False,
+    "prefer_cycle_paths": True,
+    "max_elevation_gain": 400,       # VAE, sortie plaisir
+    "max_elevation_gain_hard": 600,  # VAE, beau temps/forme
+    "favorite_starts": [
+        "Guebwiller", "Rouffach", "Colmar",
+        "Munster", "Neuf-Brisach", "Blodelsheim",
+        "Mulhouse", "Huningue", "Eguisheim",
+        "Turckheim"
+    ]
+}
+
+BIKE_TERRAIN_KEYWORDS = {
+    "vignoble": ["vignoble", "route des vins", "coteaux", "vignes"],
+    "rhin": ["rhin", "canal", "halage", "eurovelo"],
+    "plaine": ["hardt", "plaine", "forêt"],
+    "vallée": ["munster", "thur", "vallée"]
+}
+
 # Distances approximatives depuis Guebwiller (en km)
 CITY_DISTANCES = {
     # Alsace
@@ -45,6 +69,17 @@ CITY_DISTANCES = {
     "Saint-Louis": 38,
     "Erstein": 58,
     "Wittelsheim": 12,
+    "Rouffach": 8,
+    "Munster": 20,
+    "Neuf-Brisach": 30,
+    "Blodelsheim": 25,
+    "Huningue": 45,
+    "Eguisheim": 20,
+    "Turckheim": 22,
+    "Cernay": 15,
+    "Thann": 12,
+    "Soultz-Haut-Rhin": 5,
+    "Oltingue": 40,
     # Suisse
     "Bâle": 45,
     "Basel": 45,

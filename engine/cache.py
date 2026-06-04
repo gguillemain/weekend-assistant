@@ -218,6 +218,7 @@ CACHE_TTL = {
     "cinema": 360,       # 6h
     "events": 360,       # 6h
     "hiking": 1440,      # 24h
+    "cycling": 2880,     # 48h (itinéraires stables)
     "exhibitions": 720,  # 12h
     "concerts": 360,     # 6h
     "discovery": 240,    # 4h
