@@ -1,12 +1,13 @@
 """
 Module de collecte de restaurants via scraping.
-Sources : Guide Michelin Bib Gourmand, Le Fooding, Gault & Millau.
+Sources : Le Fooding, Petit Futé, Visit Alsace, TripAdvisor.
 Aucune API tierce - uniquement requests + BeautifulSoup.
 """
 
 import requests
 from bs4 import BeautifulSoup
 from typing import Dict, List
+import re
 from engine.cache import cache_get, cache_set, CACHE_TTL
 
 
@@ -19,85 +20,37 @@ HEADERS = {
     "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
     "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
     "Accept-Language": "fr-FR,fr;q=0.9,en;q=0.8",
+    "Accept-Encoding": "gzip, deflate",
+    "Connection": "keep-alive",
 }
 
+# Villes alsaciennes pour extraction
+ALSACE_CITIES = [
+    "Strasbourg", "Colmar", "Mulhouse", "Ribeauvillé", "Riquewihr", "Obernai",
+    "Sélestat", "Haguenau", "Saverne", "Wissembourg", "Kaysersberg", "Guebwiller",
+    "Thann", "Rouffach", "Soultz", "Munster", "Barr", "Molsheim", "Illkirch",
+    "Schiltigheim", "Bischheim", "Lingolsheim", "Hoenheim", "Ostwald", "Illzach",
+    "Wittenheim", "Kingersheim", "Rixheim", "Riedisheim", "Pfastatt", "Cernay",
+    "Ensisheim", "Altkirch", "Saint-Louis", "Huningue", "Wintzenheim", "Turckheim",
+    "Ammerschwihr", "Eguisheim", "Bergheim", "Marlenheim", "Wasselonne", "Brumath"
+]
 
-def _fetch_michelin_restaurants() -> List[Dict]:
-    """
-    Scrape les restaurants Bib Gourmand du Guide Michelin en Alsace.
-    """
-    url = "https://guide.michelin.com/fr/fr/alsace/restaurants?distinctions=bib-gourmand"
-    restaurants = []
 
-    print(f"\n  [MICHELIN] Scraping {url}")
-
-    try:
-        response = requests.get(url, headers=HEADERS, timeout=15)
-        print(f"  [MICHELIN] Status HTTP: {response.status_code}")
-        print(f"  [MICHELIN] HTML (500 premiers chars):\n{response.text[:500]}\n")
-
-        if response.status_code != 200:
-            print(f"  [MICHELIN] Erreur HTTP {response.status_code}")
-            return []
-
-        soup = BeautifulSoup(response.text, "html.parser")
-
-        # Chercher les cartes de restaurants
-        # Structure typique Michelin : div avec classe contenant "card" ou "restaurant"
-        cards = soup.select("div.card__menu, div.js-restaurant-card, article.card")
-        print(f"  [MICHELIN] Balises trouvées (card__menu/js-restaurant-card/article.card): {len(cards)}")
-
-        if not cards:
-            # Essayer d'autres sélecteurs
-            cards = soup.select("[data-restaurant], .restaurant-item, .poi-card")
-            print(f"  [MICHELIN] Balises alternatives (data-restaurant/restaurant-item/poi-card): {len(cards)}")
-
-        if not cards:
-            # Afficher les classes disponibles pour debug
-            all_divs = soup.find_all("div", class_=True)[:10]
-            print(f"  [MICHELIN] Exemples de classes div: {[' '.join(d.get('class', [])) for d in all_divs]}")
-
-        for card in cards[:10]:  # Limiter à 10
-            try:
-                # Extraire le nom
-                name_el = card.select_one("h2, h3, .card__menu-content--title, .restaurant-name, a.link")
-                name = name_el.get_text(strip=True) if name_el else "Restaurant"
-
-                # Extraire la ville/adresse
-                location_el = card.select_one(".card__menu-footer--location, .location, .city, address")
-                city = location_el.get_text(strip=True) if location_el else "Alsace"
-
-                # Extraire le lien
-                link_el = card.select_one("a[href*='restaurant']") or card.find("a")
-                link = link_el.get("href", "") if link_el else ""
-                if link and not link.startswith("http"):
-                    link = f"https://guide.michelin.com{link}"
-
-                if name and name != "Restaurant":
-                    restaurants.append({
-                        "title": name,
-                        "city": city,
-                        "cuisine": "Bib Gourmand",
-                        "source": "Michelin",
-                        "url": link,
-                        "reason": "Bib Gourmand - Bon rapport qualité/prix"
-                    })
-                    print(f"  [MICHELIN] Trouvé: {name} ({city})")
-
-            except Exception as e:
-                print(f"  [MICHELIN] Erreur parsing carte: {e}")
-                continue
-
-    except requests.exceptions.RequestException as e:
-        print(f"  [MICHELIN] Erreur requête: {e}")
-
-    print(f"  [MICHELIN] Total: {len(restaurants)} restaurants")
-    return restaurants
+def _extract_city(text: str) -> str:
+    """Extrait une ville alsacienne depuis un texte."""
+    if not text:
+        return "Alsace"
+    text_lower = text.lower()
+    for city in ALSACE_CITIES:
+        if city.lower() in text_lower:
+            return city
+    return "Alsace"
 
 
 def _fetch_fooding_restaurants() -> List[Dict]:
     """
     Scrape les restaurants Le Fooding en Alsace.
+    Parsing amélioré pour extraire tous les restaurants.
     """
     url = "https://lefooding.com/restaurants?region=alsace"
     restaurants = []
@@ -107,56 +60,67 @@ def _fetch_fooding_restaurants() -> List[Dict]:
     try:
         response = requests.get(url, headers=HEADERS, timeout=15)
         print(f"  [FOODING] Status HTTP: {response.status_code}")
-        print(f"  [FOODING] HTML (300 premiers chars):\n{response.text[:300]}\n")
 
         if response.status_code != 200:
             print(f"  [FOODING] Erreur HTTP {response.status_code}")
             return []
 
         soup = BeautifulSoup(response.text, "html.parser")
+        print(f"  [FOODING] HTML (300 premiers chars):\n{response.text[:300]}\n")
 
-        # Chercher les cartes de restaurants
-        cards = soup.select("article.card, div.restaurant-card, .resto-item, [data-restaurant]")
-        print(f"  [FOODING] Balises trouvées (article.card/restaurant-card/resto-item): {len(cards)}")
+        # Chercher tous les liens vers des restaurants
+        all_links = soup.find_all("a", href=True)
+        resto_links = [a for a in all_links if "/restaurants/" in a.get("href", "")
+                       and a.get("href") != "/restaurants"
+                       and not a.get("href").endswith("/restaurants/")]
+        print(f"  [FOODING] Liens /restaurants/ trouvés: {len(resto_links)}")
 
-        if not cards:
-            # Essayer d'autres sélecteurs
-            cards = soup.select("a[href*='/restaurant/'], div.card, article")
-            print(f"  [FOODING] Balises alternatives: {len(cards)}")
+        seen_names = set()
 
-        if not cards:
-            # Afficher les classes disponibles pour debug
-            all_articles = soup.find_all("article", class_=True)[:5]
-            all_divs = soup.find_all("div", class_=True)[:10]
-            print(f"  [FOODING] Exemples articles: {[' '.join(a.get('class', [])) for a in all_articles]}")
-            print(f"  [FOODING] Exemples divs: {[' '.join(d.get('class', [])) for d in all_divs]}")
-
-        for card in cards[:10]:
+        for link in resto_links[:30]:
             try:
-                name_el = card.select_one("h2, h3, .title, .name, .card-title")
-                name = name_el.get_text(strip=True) if name_el else None
+                href = link.get("href", "")
+                name = link.get_text(strip=True)
 
-                location_el = card.select_one(".location, .city, .address, .place")
-                city = location_el.get_text(strip=True) if location_el else "Alsace"
+                # Si le nom est vide, extraire de l'URL
+                if not name or len(name) < 2:
+                    match = re.search(r'/restaurants/([^/]+)', href)
+                    if match:
+                        name = match.group(1).replace('-', ' ').title()
 
-                link_el = card.select_one("a[href*='restaurant']") or card.find("a")
-                link = link_el.get("href", "") if link_el else ""
-                if link and not link.startswith("http"):
-                    link = f"https://lefooding.com{link}"
+                # Nettoyer le nom
+                name = re.sub(r'\s+', ' ', name).strip()
 
-                if name:
-                    restaurants.append({
-                        "title": name,
-                        "city": city,
-                        "cuisine": "Contemporain",
-                        "source": "Le Fooding",
-                        "url": link,
-                        "reason": "Sélection Le Fooding"
-                    })
-                    print(f"  [FOODING] Trouvé: {name} ({city})")
+                # Ignorer les noms génériques
+                if not name or len(name) < 3 or name.lower() in ['restaurants', 'voir', 'plus', 'alsace', 'en savoir plus']:
+                    continue
+
+                # Éviter les doublons
+                name_key = name.lower()
+                if name_key in seen_names:
+                    continue
+                seen_names.add(name_key)
+
+                # Chercher la ville
+                parent = link.find_parent(["article", "div", "li"])
+                city = "Alsace"
+                if parent:
+                    parent_text = parent.get_text()
+                    city = _extract_city(parent_text)
+
+                full_url = href if href.startswith("http") else f"https://lefooding.com{href}"
+
+                restaurants.append({
+                    "title": name,
+                    "city": city,
+                    "cuisine": "Contemporain",
+                    "source": "Le Fooding",
+                    "url": full_url,
+                    "reason": "Sélection Le Fooding"
+                })
+                print(f"  [FOODING] Trouvé: {name} ({city})")
 
             except Exception as e:
-                print(f"  [FOODING] Erreur parsing: {e}")
                 continue
 
     except requests.exceptions.RequestException as e:
@@ -166,88 +130,315 @@ def _fetch_fooding_restaurants() -> List[Dict]:
     return restaurants
 
 
-def _fetch_gaultmillau_restaurants() -> List[Dict]:
+def _fetch_petitfute_restaurants() -> List[Dict]:
     """
-    Scrape les restaurants Gault & Millau en Alsace.
+    Scrape les restaurants Petit Futé en Alsace.
     """
-    url = "https://www.gaultmillau.fr/restaurants/alsace"
+    url = "https://www.petitfute.com/v50952-alsace/c1165-restaurants/c1179-tables-gourmandes.html"
     restaurants = []
 
-    print(f"\n  [GAULT&MILLAU] Scraping {url}")
+    print(f"\n  [PETITFUTE] Scraping {url}")
 
     try:
         response = requests.get(url, headers=HEADERS, timeout=15)
-        print(f"  [GAULT&MILLAU] Status HTTP: {response.status_code}")
-        print(f"  [GAULT&MILLAU] HTML (300 premiers chars):\n{response.text[:300]}\n")
+        print(f"  [PETITFUTE] Status HTTP: {response.status_code}")
+        print(f"  [PETITFUTE] HTML (300 premiers chars):\n{response.text[:300]}\n")
 
         if response.status_code != 200:
-            print(f"  [GAULT&MILLAU] Erreur HTTP {response.status_code}")
+            print(f"  [PETITFUTE] Erreur HTTP {response.status_code}")
             return []
 
         soup = BeautifulSoup(response.text, "html.parser")
 
-        # Chercher les cartes de restaurants
-        cards = soup.select("article.card, div.restaurant-card, .restaurant-item, [data-restaurant]")
-        print(f"  [GAULT&MILLAU] Balises trouvées: {len(cards)}")
+        # Petit Futé utilise des cartes POI
+        cards = soup.select(".poi-item, .listing-item, article, .node-poi, [class*='poi']")
+        print(f"  [PETITFUTE] Cartes trouvées: {len(cards)}")
 
-        if not cards:
-            cards = soup.select("a[href*='/restaurant'], div.card, article, .item")
-            print(f"  [GAULT&MILLAU] Balises alternatives: {len(cards)}")
+        # Chercher aussi les liens directs
+        links = soup.select("a[href*='/v'][href*='-restaurant'], a[href*='/v'][href*='gastronomie']")
+        print(f"  [PETITFUTE] Liens restaurants: {len(links)}")
 
-        if not cards:
-            all_articles = soup.find_all("article")[:5]
-            all_divs = soup.find_all("div", class_=True)[:10]
-            print(f"  [GAULT&MILLAU] Exemples articles: {[a.get('class', []) for a in all_articles]}")
-            print(f"  [GAULT&MILLAU] Exemples divs: {[' '.join(d.get('class', [])) for d in all_divs]}")
+        seen = set()
 
-        for card in cards[:10]:
+        # Parser les cartes
+        for card in cards[:20]:
             try:
-                name_el = card.select_one("h2, h3, .title, .name, .restaurant-name")
+                name_el = card.select_one("h2, h3, .title, .name, .poi-title, a")
                 name = name_el.get_text(strip=True) if name_el else None
 
-                location_el = card.select_one(".location, .city, .address")
-                city = location_el.get_text(strip=True) if location_el else "Alsace"
+                if not name or len(name) < 3 or name.lower() in seen:
+                    continue
+                seen.add(name.lower())
 
-                # Score Gault & Millau
-                score_el = card.select_one(".score, .rating, .note, .points")
-                score = score_el.get_text(strip=True) if score_el else ""
+                location_el = card.select_one(".location, .city, .address, .poi-location")
+                city = _extract_city(location_el.get_text() if location_el else card.get_text())
 
-                link_el = card.select_one("a[href*='restaurant']") or card.find("a")
-                link = link_el.get("href", "") if link_el else ""
-                if link and not link.startswith("http"):
-                    link = f"https://www.gaultmillau.fr{link}"
+                link_el = card.select_one("a[href]")
+                href = link_el.get("href", "") if link_el else ""
+                full_url = href if href.startswith("http") else f"https://www.petitfute.com{href}"
 
-                if name:
-                    reason = f"Gault & Millau {score}" if score else "Sélection Gault & Millau"
+                restaurants.append({
+                    "title": name,
+                    "city": city,
+                    "cuisine": "Gastronomique",
+                    "source": "Petit Futé",
+                    "url": full_url,
+                    "reason": "Table gourmande Petit Futé"
+                })
+                print(f"  [PETITFUTE] Trouvé: {name} ({city})")
+
+            except Exception:
+                continue
+
+        # Parser les liens si pas assez de cartes
+        if len(restaurants) < 5:
+            for link in links[:15]:
+                try:
+                    name = link.get_text(strip=True)
+                    if not name or len(name) < 3 or name.lower() in seen:
+                        continue
+                    seen.add(name.lower())
+
+                    href = link.get("href", "")
+                    full_url = href if href.startswith("http") else f"https://www.petitfute.com{href}"
+                    city = _extract_city(name)
+
                     restaurants.append({
                         "title": name,
                         "city": city,
                         "cuisine": "Gastronomique",
-                        "source": "Gault & Millau",
-                        "url": link,
-                        "reason": reason
+                        "source": "Petit Futé",
+                        "url": full_url,
+                        "reason": "Table gourmande Petit Futé"
                     })
-                    print(f"  [GAULT&MILLAU] Trouvé: {name} ({city}) {score}")
+                    print(f"  [PETITFUTE] Trouvé (lien): {name}")
 
-            except Exception as e:
-                print(f"  [GAULT&MILLAU] Erreur parsing: {e}")
+                except Exception:
+                    continue
+
+    except requests.exceptions.RequestException as e:
+        print(f"  [PETITFUTE] Erreur requête: {e}")
+
+    print(f"  [PETITFUTE] Total: {len(restaurants)} restaurants")
+    return restaurants
+
+
+def _fetch_visitalsace_restaurants() -> List[Dict]:
+    """
+    Scrape les restaurants depuis Visit Alsace (tourisme officiel).
+    """
+    url = "https://www.visit.alsace/ou-manger/restaurants-gastronomiques/"
+    restaurants = []
+
+    print(f"\n  [VISITALSACE] Scraping {url}")
+
+    try:
+        response = requests.get(url, headers=HEADERS, timeout=15)
+        print(f"  [VISITALSACE] Status HTTP: {response.status_code}")
+        print(f"  [VISITALSACE] HTML (300 premiers chars):\n{response.text[:300]}\n")
+
+        if response.status_code != 200:
+            # Essayer URL alternative
+            alt_url = "https://www.visit.alsace/gastronomie/restaurants/"
+            print(f"  [VISITALSACE] Essai URL alternative: {alt_url}")
+            response = requests.get(alt_url, headers=HEADERS, timeout=15)
+            print(f"  [VISITALSACE] Status HTTP alt: {response.status_code}")
+            if response.status_code != 200:
+                return []
+
+        soup = BeautifulSoup(response.text, "html.parser")
+
+        # Visit Alsace utilise des cartes SIT
+        cards = soup.select("article, .card, .item, [class*='card'], [class*='result'], .sit-item")
+        print(f"  [VISITALSACE] Cartes trouvées: {len(cards)}")
+
+        seen = set()
+
+        for card in cards[:20]:
+            try:
+                name_el = card.select_one("h2, h3, .title, .name, a")
+                name = name_el.get_text(strip=True) if name_el else None
+
+                if not name or len(name) < 3:
+                    continue
+
+                # Filtrer les noms génériques
+                if name.lower() in ['voir plus', 'découvrir', 'restaurants', 'en savoir plus', 'alsace']:
+                    continue
+
+                if name.lower() in seen:
+                    continue
+                seen.add(name.lower())
+
+                city = _extract_city(card.get_text())
+
+                link_el = card.select_one("a[href]")
+                href = link_el.get("href", "") if link_el else ""
+                full_url = href if href.startswith("http") else f"https://www.visit.alsace{href}"
+
+                restaurants.append({
+                    "title": name,
+                    "city": city,
+                    "cuisine": "Alsacien",
+                    "source": "Visit Alsace",
+                    "url": full_url,
+                    "reason": "Recommandé par Visit Alsace"
+                })
+                print(f"  [VISITALSACE] Trouvé: {name} ({city})")
+
+            except Exception:
                 continue
 
     except requests.exceptions.RequestException as e:
-        print(f"  [GAULT&MILLAU] Erreur requête: {e}")
+        print(f"  [VISITALSACE] Erreur requête: {e}")
 
-    print(f"  [GAULT&MILLAU] Total: {len(restaurants)} restaurants")
+    print(f"  [VISITALSACE] Total: {len(restaurants)} restaurants")
+    return restaurants
+
+
+def _fetch_tripadvisor_restaurants() -> List[Dict]:
+    """
+    Scrape les meilleurs restaurants TripAdvisor en Alsace.
+    """
+    url = "https://www.tripadvisor.fr/Restaurants-g187073-Alsace.html"
+    restaurants = []
+
+    print(f"\n  [TRIPADVISOR] Scraping {url}")
+
+    try:
+        ta_headers = HEADERS.copy()
+        ta_headers["Referer"] = "https://www.tripadvisor.fr/"
+
+        response = requests.get(url, headers=ta_headers, timeout=15)
+        print(f"  [TRIPADVISOR] Status HTTP: {response.status_code}")
+        print(f"  [TRIPADVISOR] HTML (300 premiers chars):\n{response.text[:300]}\n")
+
+        if response.status_code != 200:
+            print(f"  [TRIPADVISOR] Erreur HTTP {response.status_code}")
+            return []
+
+        soup = BeautifulSoup(response.text, "html.parser")
+
+        # Chercher les liens vers restaurants
+        links = soup.select("a[href*='Restaurant_Review']")
+        print(f"  [TRIPADVISOR] Liens Restaurant_Review: {len(links)}")
+
+        seen = set()
+        for link in links[:20]:
+            try:
+                name = link.get_text(strip=True)
+                if not name or len(name) < 3 or name.lower() in seen:
+                    continue
+
+                # Filtrer les textes non-restaurant
+                if any(x in name.lower() for x in ['avis', 'voir', 'photo', 'menu', 'réserver']):
+                    continue
+
+                seen.add(name.lower())
+                href = link.get("href", "")
+                full_url = href if href.startswith("http") else f"https://www.tripadvisor.fr{href}"
+
+                # Extraire la ville du contexte
+                parent = link.find_parent(["div", "li", "article"])
+                city = "Alsace"
+                if parent:
+                    city = _extract_city(parent.get_text())
+
+                restaurants.append({
+                    "title": name,
+                    "city": city,
+                    "cuisine": "Gastronomique",
+                    "source": "TripAdvisor",
+                    "url": full_url,
+                    "reason": "Top TripAdvisor Alsace"
+                })
+                print(f"  [TRIPADVISOR] Trouvé: {name} ({city})")
+
+            except Exception:
+                continue
+
+    except requests.exceptions.RequestException as e:
+        print(f"  [TRIPADVISOR] Erreur requête: {e}")
+
+    print(f"  [TRIPADVISOR] Total: {len(restaurants)} restaurants")
+    return restaurants
+
+
+def _fetch_lalsace_restaurants() -> List[Dict]:
+    """
+    Scrape les restaurants depuis L'Alsace/DNA (presse locale).
+    Section gastronomie.
+    """
+    url = "https://www.lalsace.fr/magazine/gastronomie"
+    restaurants = []
+
+    print(f"\n  [LALSACE] Scraping {url}")
+
+    try:
+        response = requests.get(url, headers=HEADERS, timeout=15)
+        print(f"  [LALSACE] Status HTTP: {response.status_code}")
+        print(f"  [LALSACE] HTML (300 premiers chars):\n{response.text[:300]}\n")
+
+        if response.status_code != 200:
+            print(f"  [LALSACE] Erreur HTTP {response.status_code}")
+            return []
+
+        soup = BeautifulSoup(response.text, "html.parser")
+
+        # Chercher les articles
+        articles = soup.select("article, .article, .teaser, [class*='article']")
+        print(f"  [LALSACE] Articles trouvés: {len(articles)}")
+
+        resto_keywords = ["restaurant", "table", "chef", "cuisine", "étoile", "gastronomie",
+                         "winstub", "auberge", "hostellerie", "relais"]
+
+        for article in articles[:15]:
+            try:
+                title_el = article.select_one("h2, h3, .title, a")
+                title = title_el.get_text(strip=True) if title_el else None
+
+                if not title or len(title) < 5:
+                    continue
+
+                # Filtrer par mots-clés restaurant
+                if not any(kw in title.lower() for kw in resto_keywords):
+                    continue
+
+                link_el = article.select_one("a[href]")
+                href = link_el.get("href", "") if link_el else ""
+                full_url = href if href.startswith("http") else f"https://www.lalsace.fr{href}"
+
+                city = _extract_city(title + " " + article.get_text())
+
+                restaurants.append({
+                    "title": title[:60],
+                    "city": city,
+                    "cuisine": "Gastronomique",
+                    "source": "L'Alsace",
+                    "url": full_url,
+                    "reason": "Article gastronomie L'Alsace"
+                })
+                print(f"  [LALSACE] Trouvé: {title[:50]}...")
+
+            except Exception:
+                continue
+
+    except requests.exceptions.RequestException as e:
+        print(f"  [LALSACE] Erreur requête: {e}")
+
+    print(f"  [LALSACE] Total: {len(restaurants)} restaurants")
     return restaurants
 
 
 def _deduplicate_restaurants(restaurants: List[Dict]) -> List[Dict]:
-    """Supprime les doublons par nom de restaurant."""
+    """Supprime les doublons par nom de restaurant (normalisation)."""
     seen = set()
     unique = []
     for r in restaurants:
-        name_lower = r["title"].lower().strip()
-        if name_lower not in seen:
-            seen.add(name_lower)
+        # Normaliser le nom pour comparaison
+        name_normalized = re.sub(r'[^a-z0-9]', '', r["title"].lower())
+        if name_normalized not in seen and len(name_normalized) > 2:
+            seen.add(name_normalized)
             unique.append(r)
     return unique
 
@@ -255,7 +446,7 @@ def _deduplicate_restaurants(restaurants: List[Dict]) -> List[Dict]:
 def get_restaurant_suggestions(period: Dict) -> List[Dict]:
     """
     Récupère les suggestions de restaurants pour une période donnée.
-    Scrape Michelin, Le Fooding et Gault & Millau.
+    Scrape Le Fooding, Petit Futé, Visit Alsace, TripAdvisor, L'Alsace.
     """
     period_start = period.get("start", "")
     cache_key = f"restaurants_{period_start}"
@@ -270,18 +461,26 @@ def get_restaurant_suggestions(period: Dict) -> List[Dict]:
 
     all_restaurants = []
 
-    # Scraper les 3 sources
-    michelin = _fetch_michelin_restaurants()
-    all_restaurants.extend(michelin)
-
+    # Scraper les sources (ordre de priorité)
     fooding = _fetch_fooding_restaurants()
     all_restaurants.extend(fooding)
 
-    gaultmillau = _fetch_gaultmillau_restaurants()
-    all_restaurants.extend(gaultmillau)
+    petitfute = _fetch_petitfute_restaurants()
+    all_restaurants.extend(petitfute)
+
+    visitalsace = _fetch_visitalsace_restaurants()
+    all_restaurants.extend(visitalsace)
+
+    tripadvisor = _fetch_tripadvisor_restaurants()
+    all_restaurants.extend(tripadvisor)
+
+    lalsace = _fetch_lalsace_restaurants()
+    all_restaurants.extend(lalsace)
 
     # Dédupliquer
     all_restaurants = _deduplicate_restaurants(all_restaurants)
+
+    print(f"\n  [TOTAL] {len(all_restaurants)} restaurants uniques trouvés")
 
     if not all_restaurants:
         print("  ⚠ Aucun restaurant trouvé via scraping")
@@ -295,14 +494,15 @@ def get_restaurant_suggestions(period: Dict) -> List[Dict]:
     if not available:
         available = all_restaurants  # Fallback
 
-    # Sélectionner 3 restaurants (un de chaque source si possible)
+    # Sélectionner 3 restaurants avec priorité aux sources de qualité
     selected = []
-    sources_used = set()
+    priority_sources = ["Le Fooding", "Petit Futé", "TripAdvisor", "Visit Alsace", "L'Alsace"]
 
-    for r in available:
-        if r["source"] not in sources_used and len(selected) < 3:
-            selected.append(r)
-            sources_used.add(r["source"])
+    for source in priority_sources:
+        for r in available:
+            if r["source"] == source and r not in selected and len(selected) < 3:
+                selected.append(r)
+                break
 
     # Compléter si moins de 3
     for r in available:
