@@ -1,373 +1,361 @@
 """
-Module de collecte de restaurants via Foursquare Places API.
-Propose 3 suggestions de restaurants locaux avec un mix de styles.
+Module de collecte de restaurants — Liste statique Michelin/Gault&Millau.
+Mise à jour annuelle (mars) basée sur les guides officiels.
+Aucun scraping, aucune API — données fiables et stables.
 """
 
-import requests
-from typing import Dict, List, Optional
-
+from typing import Dict, List
 import config
 from engine.cache import cache_get, cache_set, CACHE_TTL
 
 
-# Coordonnées de Guebwiller
-GUEBWILLER_LAT = 47.9069
-GUEBWILLER_LON = 7.2147
+# =============================================================================
+# LISTE STATIQUE — MISE À JOUR ANNUELLE (MARS 2026)
+# =============================================================================
 
-# Rayon de recherche en mètres (20km)
-SEARCH_RADIUS = 20000
+BIB_GOURMAND_ALSACE = [
+    # -------------------------------------------------------------------------
+    # Haut-Rhin — proches de Guebwiller
+    # -------------------------------------------------------------------------
+    {
+        "name": "L'AO – L'Aigle d'Or",
+        "city": "Rimbach-près-Guebwiller",
+        "cuisine": "alsacienne",
+        "price": "€€",
+        "distinction": "Bib Gourmand",
+        "url": "https://guide.michelin.com/fr/fr/alsace/rimbach-pres-guebwiller/restaurant/l-ao-l-aigle-d-or"
+    },
+    {
+        "name": "L'Arbre Vert",
+        "city": "Bernwiller",
+        "cuisine": "alsacienne",
+        "price": "€€",
+        "distinction": "Bib Gourmand",
+        "url": "https://guide.michelin.com/fr/fr/alsace/bernwiller/restaurant/l-arbre-vert"
+    },
+    {
+        "name": "Perle des Vosges",
+        "city": "Muhlbach-sur-Munster",
+        "cuisine": "régionale",
+        "price": "€€",
+        "distinction": "Bib Gourmand",
+        "url": "https://guide.michelin.com/fr/fr/alsace/muhlbach-sur-munster/restaurant/perle-des-vosges"
+    },
+    {
+        "name": "La Taverne Alsacienne",
+        "city": "Ingersheim",
+        "cuisine": "alsacienne",
+        "price": "€€",
+        "distinction": "Bib Gourmand",
+        "url": "https://guide.michelin.com/fr/fr/alsace/ingersheim/restaurant/la-taverne-alsacienne"
+    },
+    {
+        "name": "La Vieille Forge",
+        "city": "Kaysersberg",
+        "cuisine": "alsacienne",
+        "price": "€€",
+        "distinction": "Bib Gourmand",
+        "url": "https://guide.michelin.com/fr/fr/alsace/kaysersberg-vignoble/restaurant/la-vieille-forge"
+    },
+    {
+        "name": "Winstub du Chambard",
+        "city": "Kaysersberg",
+        "cuisine": "winstub",
+        "price": "€€",
+        "distinction": "Bib Gourmand",
+        "url": "https://guide.michelin.com/fr/fr/alsace/kaysersberg-vignoble/restaurant/winstub-du-chambard"
+    },
+    {
+        "name": "La Rochette",
+        "city": "Labaroche",
+        "cuisine": "régionale",
+        "price": "€€",
+        "distinction": "Bib Gourmand",
+        "url": "https://guide.michelin.com/fr/fr/alsace/labaroche/restaurant/la-rochette"
+    },
+    {
+        "name": "Les Grands Arbres – Verte Vallée",
+        "city": "Munster",
+        "cuisine": "gastronomique",
+        "price": "€€",
+        "distinction": "Bib Gourmand",
+        "url": "https://guide.michelin.com/fr/fr/alsace/munster/restaurant/les-grands-arbres-verte-vallee"
+    },
+    {
+        "name": "L'Olivier",
+        "city": "Munster",
+        "cuisine": "bistronomique",
+        "price": "€€",
+        "distinction": "Bib Gourmand",
+        "url": "https://guide.michelin.com/fr/fr/alsace/munster/restaurant/l-olivier"
+    },
+    {
+        "name": "Au Relais des Ménétriers",
+        "city": "Ribeauvillé",
+        "cuisine": "alsacienne",
+        "price": "€€",
+        "distinction": "Bib Gourmand",
+        "url": "https://guide.michelin.com/fr/fr/alsace/ribeauville/restaurant/au-relais-des-menetriers"
+    },
+    {
+        "name": "Le Pressoir de Bacchus",
+        "city": "Blienschwiller",
+        "cuisine": "alsacienne",
+        "price": "€€",
+        "distinction": "Bib Gourmand",
+        "url": "https://guide.michelin.com/fr/fr/alsace/blienschwiller/restaurant/le-pressoir-de-bacchus"
+    },
+    {
+        "name": "Winstub A Côté",
+        "city": "Sierentz",
+        "cuisine": "winstub",
+        "price": "€",
+        "distinction": "Bib Gourmand",
+        "url": "https://guide.michelin.com/fr/fr/alsace/sierentz/restaurant/winstub-a-cote"
+    },
+    {
+        "name": "Au Lion d'Or – chez Théo",
+        "city": "Rosenau",
+        "cuisine": "alsacienne",
+        "price": "€€",
+        "distinction": "Bib Gourmand",
+        "url": "https://guide.michelin.com/fr/fr/alsace/rosenau/restaurant/au-lion-d-or-chez-theo"
+    },
 
-# Catégories Foursquare pour restaurants
-# https://docs.foursquare.com/data-products/docs/categories
-FOURSQUARE_CATEGORIES = "13065"  # Restaurants
+    # -------------------------------------------------------------------------
+    # Colmar
+    # -------------------------------------------------------------------------
+    {
+        "name": "L'Atelier du Peintre",
+        "city": "Colmar",
+        "cuisine": "gastronomique",
+        "price": "€€€",
+        "distinction": "1 étoile Michelin",
+        "url": "https://guide.michelin.com/fr/fr/alsace/colmar/restaurant/l-atelier-du-peintre"
+    },
+    {
+        "name": "Wistub Brenner",
+        "city": "Colmar",
+        "cuisine": "winstub",
+        "price": "€€",
+        "distinction": "recommandé",
+        "url": "https://www.wistub-brenner.fr"
+    },
 
-# Mapping des catégories Foursquare vers nos types de cuisine
-CUISINE_CATEGORY_MAP = {
-    # Alsacien / Français
-    "13068": "Alsacien",      # French Restaurant
-    "13001": "Francais",      # Bistro
-    "13002": "Francais",      # Brasserie
-    # Italien
-    "13064": "Italien",       # Italian Restaurant
-    "13065": "Italien",       # Pizzeria (sous-catégorie)
-    # Asiatique
-    "13072": "Asiatique",     # Japanese Restaurant
-    "13099": "Asiatique",     # Chinese Restaurant
-    "13097": "Asiatique",     # Vietnamese Restaurant
-    "13352": "Asiatique",     # Thai Restaurant
-    "13303": "Asiatique",     # Sushi Restaurant
-    # Gastronomique
-    "13377": "Gastronomique", # Fine Dining Restaurant
-}
+    # -------------------------------------------------------------------------
+    # Mulhouse
+    # -------------------------------------------------------------------------
+    {
+        "name": "Le Gavroche",
+        "city": "Mulhouse",
+        "cuisine": "bistronomique",
+        "price": "€€",
+        "distinction": "recommandé",
+        "url": "https://www.restaurant-gavroche-mulhouse.fr"
+    },
 
-# Mots-clés pour détecter le type de cuisine depuis le nom
-CUISINE_KEYWORDS = {
-    "alsacien": ["winstub", "alsace", "alsacien", "choucroute", "flammekueche", "baeckeoffe", "caveau"],
-    "italien": ["italien", "pizza", "pasta", "trattoria", "ristorante", "pizzeria", "osteria"],
-    "asiatique": ["asiatique", "chinois", "japonais", "vietnamien", "thai", "sushi", "wok", "asia"],
-    "francais": ["français", "bistrot", "brasserie", "terroir", "traditionnel", "auberge", "hostellerie", "hôtellerie", "relais", "atelier"],
-    "gastronomique": ["gastronomique", "étoilé", "gourmet", "table", "maison"],
-}
+    # -------------------------------------------------------------------------
+    # Strasbourg
+    # -------------------------------------------------------------------------
+    {
+        "name": "Chez Yvonne – S'Burjerstuewel",
+        "city": "Strasbourg",
+        "cuisine": "winstub",
+        "price": "€€",
+        "distinction": "Bib Gourmand",
+        "url": "https://guide.michelin.com/fr/fr/alsace/strasbourg/restaurant/chez-yvonne-s-burjerstuewel"
+    },
+    {
+        "name": "Au Pont du Corbeau",
+        "city": "Strasbourg",
+        "cuisine": "alsacienne",
+        "price": "€€",
+        "distinction": "Bib Gourmand",
+        "url": "https://guide.michelin.com/fr/fr/alsace/strasbourg/restaurant/au-pont-du-corbeau"
+    },
 
-# Chaînes et fast-foods à exclure
-EXCLUDED_CHAINS = [
-    "mcdonald", "burger king", "kfc", "quick", "subway", "domino", "pizza hut",
-    "flunch", "buffalo grill", "hippopotamus", "courtepaille", "del arte",
-    "la pataterie", "léon de bruxelles", "au bureau", "columbus café",
-    "starbucks", "paul", "brioche dorée", "class croute", "pomme de pain",
-    "five guys", "o'tacos", "bagelstein", "eat sushi", "sushi shop"
+    # -------------------------------------------------------------------------
+    # Bâle (Suisse)
+    # -------------------------------------------------------------------------
+    {
+        "name": "Kunsthalle Restaurant",
+        "city": "Bâle",
+        "cuisine": "bistronomique",
+        "price": "€€",
+        "distinction": "recommandé",
+        "url": "https://www.kunsthallebasel.ch/restaurant"
+    },
+    {
+        "name": "Chez Donati",
+        "city": "Bâle",
+        "cuisine": "italienne",
+        "price": "€€€",
+        "distinction": "recommandé Gault&Millau",
+        "url": "https://www.donati.ch"
+    },
 ]
 
-# Catégories Foursquare à exclure (fast-food, etc.)
-EXCLUDED_CATEGORIES = [
-    "fast food", "burger", "sandwich", "coffee shop", "café", "bakery",
-    "ice cream", "donut", "bagel", "juice bar", "smoothie"
-]
+
+# =============================================================================
+# DISTANCES DEPUIS GUEBWILLER (en km)
+# Complète config.CITY_DISTANCES pour les petites communes
+# =============================================================================
+
+RESTAURANT_DISTANCES = {
+    # Proches de Guebwiller (< 20km)
+    "Rimbach-près-Guebwiller": 5,
+    "Bernwiller": 12,
+    "Muhlbach-sur-Munster": 18,
+    "Ingersheim": 22,
+    "Kaysersberg": 28,
+    "Labaroche": 35,
+    "Munster": 20,
+    "Ribeauvillé": 35,
+    "Blienschwiller": 45,
+    "Sierentz": 30,
+    "Rosenau": 42,
+    # Villes principales
+    "Colmar": 25,
+    "Mulhouse": 25,
+    "Strasbourg": 100,
+    "Bâle": 45,
+    "Basel": 45,
+}
 
 
-def _get_foursquare_headers() -> Dict[str, str]:
-    """Retourne les headers pour l'API Foursquare (nouvelle API 2025)."""
-    return {
-        "Authorization": f"Bearer {config.FOURSQUARE_API_KEY}",
-        "Accept": "application/json",
-        "X-Places-Api-Version": "2025-06-17"
-    }
+def _get_distance(city: str) -> int:
+    """Retourne la distance depuis Guebwiller."""
+    # D'abord chercher dans notre liste locale
+    if city in RESTAURANT_DISTANCES:
+        return RESTAURANT_DISTANCES[city]
+    # Sinon dans config.CITY_DISTANCES
+    if hasattr(config, 'CITY_DISTANCES') and city in config.CITY_DISTANCES:
+        return config.CITY_DISTANCES[city]
+    # Défaut
+    return 50
 
 
-def _is_excluded_restaurant(name: str, categories: List[Dict]) -> bool:
-    """Vérifie si le restaurant est une chaîne ou fast-food à exclure."""
-    name_lower = name.lower()
-
-    # Vérifier le nom contre les chaînes exclues
-    for chain in EXCLUDED_CHAINS:
-        if chain in name_lower:
-            return True
-
-    # Vérifier les catégories
-    for cat in categories:
-        cat_name = cat.get("name", "").lower()
-        for excluded in EXCLUDED_CATEGORIES:
-            if excluded in cat_name:
-                return True
-
-    return False
-
-
-def _detect_cuisine_type(name: str, categories: List[Dict]) -> str:
-    """Détecte le type de cuisine depuis le nom et les catégories Foursquare."""
-    name_lower = name.lower()
-
-    # D'abord chercher dans les mots-clés du nom
-    for cuisine, keywords in CUISINE_KEYWORDS.items():
-        for keyword in keywords:
-            if keyword in name_lower:
-                return cuisine.capitalize()
-
-    # Ensuite chercher dans les catégories Foursquare (nouvelle API avec BSON IDs)
-    # On utilise le nom de la catégorie plutôt que l'ID
-    for cat in categories:
-        cat_name = cat.get("name", "").lower()
-        # Mapping par nom de catégorie
-        if any(kw in cat_name for kw in ["french", "bistro", "brasserie"]):
-            return "Francais"
-        if any(kw in cat_name for kw in ["italian", "pizza", "pasta"]):
-            return "Italien"
-        if any(kw in cat_name for kw in ["japanese", "chinese", "vietnamese", "thai", "sushi", "asian"]):
-            return "Asiatique"
-        if any(kw in cat_name for kw in ["fine dining", "gourmet"]):
-            return "Gastronomique"
-        if any(kw in cat_name for kw in ["alsacien", "winstub"]):
-            return "Alsacien"
-
-    return "Francais"  # Défaut
-
-
-def _price_level_to_string(price: Optional[int]) -> str:
-    """Convertit le niveau de prix Foursquare en chaîne."""
-    if price is None:
-        return "N/C"
-    mapping = {1: "€", 2: "€€", 3: "€€€", 4: "€€€€"}
-    return mapping.get(price, "N/C")
-
-
-def _calculate_distance(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
-    """Calcule la distance approximative en km entre deux points."""
-    from math import radians, sin, cos, sqrt, atan2
-
-    R = 6371  # Rayon de la Terre en km
-
-    dlat = radians(lat2 - lat1)
-    dlon = radians(lon2 - lon1)
-
-    a = sin(dlat/2)**2 + cos(radians(lat1)) * cos(radians(lat2)) * sin(dlon/2)**2
-    c = 2 * atan2(sqrt(a), sqrt(1-a))
-
-    return R * c
-
-
-def _fetch_restaurants_from_foursquare() -> List[Dict]:
-    """Récupère les restaurants depuis Foursquare Places API (nouvelle API 2025)."""
-    api_key = config.FOURSQUARE_API_KEY
-
-    if not api_key:
-        print("  ⚠ Restaurants : FOURSQUARE_API_KEY non configurée")
-        return []
-
-    # Nouvelle URL API 2025 (sans /v3/)
-    url = "https://places-api.foursquare.com/places/search"
-
-    params = {
-        "ll": f"{GUEBWILLER_LAT},{GUEBWILLER_LON}",
-        "radius": SEARCH_RADIUS,
-        "categories": FOURSQUARE_CATEGORIES,
-        "limit": 20  # On récupère plus pour filtrer les fast-foods
-    }
-
-    all_restaurants = []
-
-    try:
-        response = requests.get(url, headers=_get_foursquare_headers(), params=params, timeout=15)
-        response.raise_for_status()
-        data = response.json()
-
-        results = data.get("results", [])
-
-        for place in results:
-            # Filtrer les chaînes et fast-foods
-            categories = place.get("categories", [])
-            if _is_excluded_restaurant(place.get("name", ""), categories):
-                continue
-
-            # Nouvelle API : latitude/longitude directement ou dans location
-            lat = place.get("latitude") or place.get("location", {}).get("latitude", GUEBWILLER_LAT)
-            lng = place.get("longitude") or place.get("location", {}).get("longitude", GUEBWILLER_LON)
-
-            # Calculer la distance
-            distance = _calculate_distance(GUEBWILLER_LAT, GUEBWILLER_LON, lat, lng)
-
-            # Extraire la ville depuis location
-            location = place.get("location", {})
-            city = location.get("locality", location.get("region", ""))
-
-            # Détecter le type de cuisine (categories déjà récupéré plus haut)
-            cuisine = _detect_cuisine_type(place.get("name", ""), categories)
-
-            # Rating Foursquare est sur 10, on le convertit sur 5
-            rating_10 = place.get("rating", 0)
-            rating = round(rating_10 / 2, 1) if rating_10 else 0
-
-            # Popularity comme proxy pour les avis (stats supprimé dans nouvelle API)
-            popularity = place.get("popularity", 0)
-            reviews_count = int(popularity * 100) if popularity > 0 else 0
-
-            # Construire l'adresse
-            address = location.get("formatted_address", location.get("address", ""))
-
-            # URL Google Maps pour la navigation
-            maps_url = f"https://www.google.com/maps/search/?api=1&query={lat},{lng}"
-
-            restaurant = {
-                "title": place.get("name", "Restaurant"),
-                "cuisine": cuisine,
-                "city": city,
-                "distance_km": round(distance, 1),
-                "rating": rating,
-                "reviews_count": reviews_count,
-                "price_level": _price_level_to_string(place.get("price")),
-                "address": address,
-                "fsq_id": place.get("fsq_place_id", ""),
-                "url": maps_url,
-                "reason": ""
-            }
-
-            all_restaurants.append(restaurant)
-
-    except requests.exceptions.RequestException as e:
-        print(f"  ⚠ Erreur Foursquare API: {e}")
-        return []
-
-    return all_restaurants
-
-
-def _score_restaurant(restaurant: Dict) -> float:
-    """Calcule un score pour un restaurant."""
+def _calculate_value_score(restaurant: Dict) -> float:
+    """
+    Calcule le score de valeur d'un restaurant.
+    Plus le score est élevé, plus le restaurant est recommandé.
+    """
     score = 0.0
 
-    # Note (0-5) -> 0-0.5
-    rating = restaurant.get("rating", 0)
-    score += (rating / 5) * 0.5
-
-    # Nombre d'avis/activité (logarithmique)
-    reviews = restaurant.get("reviews_count", 0)
-    if reviews > 500:
+    # Distinction
+    distinction = restaurant.get("distinction", "").lower()
+    if "bib gourmand" in distinction:
+        score += 0.4
+    elif "étoile" in distinction or "etoile" in distinction:
         score += 0.3
-    elif reviews > 200:
-        score += 0.25
-    elif reviews > 100:
-        score += 0.2
-    elif reviews > 50:
-        score += 0.15
-    elif reviews > 20:
-        score += 0.1
-
-    # Proximité (bonus si proche)
-    distance = restaurant.get("distance_km", 20)
-    if distance < 5:
-        score += 0.15
-    elif distance < 10:
-        score += 0.1
-    elif distance < 15:
-        score += 0.05
-
-    # Pénalité si pas de note
-    if rating == 0:
-        score -= 0.2
-
-    # Bonus pour restaurants gastronomiques/de qualité
-    cuisine = restaurant.get("cuisine", "").lower()
-    if cuisine == "gastronomique":
-        score += 0.3
-
-    # Bonus pour mots-clés de qualité dans le nom
-    name_lower = restaurant.get("title", "").lower()
-    quality_keywords = ["hostellerie", "hôtellerie", "relais", "atelier", "maison", "table", "auberge"]
-    if any(kw in name_lower for kw in quality_keywords):
+    elif "recommandé" in distinction or "recommande" in distinction:
         score += 0.2
 
-    # Bonus pour niveau de prix élevé (signe de qualité)
-    price = restaurant.get("price_level", "")
-    if price in ["€€€", "€€€€"]:
-        score += 0.15
+    # Prix (bon rapport qualité/prix)
+    price = restaurant.get("price", "€€")
+    if price == "€":
+        score += 0.2
     elif price == "€€":
-        score += 0.05
+        score += 0.1
 
-    return score
+    # Distance (proximité favorisée)
+    distance = restaurant.get("distance_km", 50)
+    if distance < 15:
+        score += 0.3
+    elif distance < 30:
+        score += 0.2
+    elif distance < 50:
+        score += 0.1
+
+    # Cuisine (winstub et alsacienne favorisées)
+    cuisine = restaurant.get("cuisine", "").lower()
+    if cuisine in ["winstub", "alsacienne"]:
+        score += 0.1
+
+    return round(score, 2)
 
 
-def _select_mix_restaurants(restaurants: List[Dict], seen_restaurants: set) -> List[Dict]:
+def _calculate_profile_match(restaurant: Dict, profile: Dict) -> float:
     """
-    Sélectionne 3 restaurants avec une stratégie de mix :
-    1. Un restaurant bien noté (>4.0, populaire)
-    2. Une découverte (moins connu mais bien noté)
-    3. Une cuisine différente des deux premiers
+    Calcule la correspondance avec le profil utilisateur.
+    Pour l'instant, retourne 0.5 par défaut.
+    Sera affiné avec le feedback utilisateur.
     """
-    if not restaurants:
-        return []
-
-    selected = []
-    used_cuisines = set()
-
-    # Filtrer les restaurants déjà vus
-    available = [r for r in restaurants if r["title"].lower() not in seen_restaurants]
-
-    if not available:
-        available = restaurants  # Fallback si tous ont été vus
-
-    # 1. Restaurant bien noté
-    well_rated = [r for r in available if r["rating"] >= 4.0 and r["reviews_count"] >= 50]
-    well_rated.sort(key=lambda r: _score_restaurant(r), reverse=True)
-
-    if well_rated:
-        best = well_rated[0]
-        best["reason"] = "Bien noté, valeur sûre"
-        selected.append(best)
-        used_cuisines.add(best["cuisine"].lower())
-        available = [r for r in available if r["title"] != best["title"]]
-
-    # 2. Découverte (moins connu mais bien noté)
-    discoveries = [r for r in available
-                   if r["rating"] >= 3.8 and r["reviews_count"] < 50 and r["reviews_count"] > 0]
-    discoveries.sort(key=lambda r: r["rating"], reverse=True)
-
-    if discoveries:
-        discovery = discoveries[0]
-        discovery["reason"] = "Petite perle à découvrir"
-        selected.append(discovery)
-        used_cuisines.add(discovery["cuisine"].lower())
-        available = [r for r in available if r["title"] != discovery["title"]]
-
-    # 3. Cuisine différente
-    different_cuisine = [r for r in available
-                        if r["cuisine"].lower() not in used_cuisines and r["rating"] >= 3.5]
-    different_cuisine.sort(key=lambda r: _score_restaurant(r), reverse=True)
-
-    if different_cuisine:
-        diff = different_cuisine[0]
-        diff["reason"] = f"Pour changer, cuisine {diff['cuisine'].lower()}"
-        selected.append(diff)
-    elif available:
-        # Fallback : prendre le meilleur restant
-        available.sort(key=lambda r: _score_restaurant(r), reverse=True)
-        if available:
-            fallback = available[0]
-            fallback["reason"] = "Recommandé"
-            selected.append(fallback)
-
-    # Compléter si moins de 3
-    remaining = [r for r in restaurants if r["title"] not in [s["title"] for s in selected]]
-    remaining.sort(key=lambda r: _score_restaurant(r), reverse=True)
-
-    while len(selected) < 3 and remaining:
-        next_best = remaining.pop(0)
-        next_best["reason"] = next_best.get("reason") or "Bonne adresse"
-        selected.append(next_best)
-
-    return selected[:3]
+    # TODO: Affiner avec les préférences gastronomiques du profil
+    # - cuisines préférées
+    # - gamme de prix
+    # - types de sorties (winstub vs gastro)
+    return 0.5
 
 
-def get_restaurant_suggestions(period: Dict) -> List[Dict]:
+def get_restaurants(period: Dict, profile: Dict = None) -> List[Dict]:
     """
-    Récupère les suggestions de restaurants pour une période donnée.
+    Retourne la liste des restaurants triée par value_score.
 
     Args:
-        period: Dict avec start, end
+        period: Période (pour le cache)
+        profile: Profil utilisateur (optionnel)
 
     Returns:
-        Liste de 3 restaurants suggérés
+        Liste de restaurants avec scores calculés
+    """
+    if profile is None:
+        profile = {}
+
+    # Construire la liste avec scores
+    restaurants = []
+
+    for resto in BIB_GOURMAND_ALSACE:
+        distance = _get_distance(resto["city"])
+
+        restaurant = {
+            "title": resto["name"],
+            "city": resto["city"],
+            "cuisine": resto["cuisine"],
+            "price_level": resto["price"],
+            "distinction": resto["distinction"],
+            "url": resto["url"],
+            "distance_km": distance,
+            "source": "Guide Michelin",
+        }
+
+        # Calculer les scores
+        restaurant["value_score"] = _calculate_value_score(restaurant)
+        restaurant["profile_match"] = _calculate_profile_match(restaurant, profile)
+
+        # Raison de la recommandation
+        if "Bib Gourmand" in resto["distinction"]:
+            restaurant["reason"] = f"Bib Gourmand — {resto['cuisine']} à {distance}km"
+        elif "étoile" in resto["distinction"]:
+            restaurant["reason"] = f"⭐ {resto['distinction']} — {resto['cuisine']}"
+        else:
+            restaurant["reason"] = f"{resto['distinction']} — {resto['cuisine']}"
+
+        restaurants.append(restaurant)
+
+    # Trier par value_score décroissant
+    restaurants.sort(key=lambda r: r["value_score"], reverse=True)
+
+    # Afficher le top 5 pour debug
+    print("\n  [RESTAURANTS] Top 5 par value_score :")
+    for i, r in enumerate(restaurants[:5], 1):
+        print(f"    {i}. {r['title']} ({r['city']}) — {r['distance_km']}km — {r['distinction']} — score={r['value_score']}")
+
+    # Vérifier que L'Aigle d'Or apparaît bien en tête
+    if restaurants and "Aigle d'Or" in restaurants[0]["title"]:
+        print("  ✓ L'Aigle d'Or (Rimbach) en tête comme attendu")
+    else:
+        print(f"  ⚠ Premier résultat: {restaurants[0]['title'] if restaurants else 'aucun'}")
+
+    return restaurants
+
+
+def get_restaurant_suggestions(period: Dict, profile: Dict = None) -> List[Dict]:
+    """
+    Récupère les suggestions de restaurants pour une période donnée.
+    Wrapper pour compatibilité avec le reste du code.
     """
     period_start = period.get("start", "")
-
-    # Clé de cache
     cache_key = f"restaurants_{period_start}"
 
     # Vérifier le cache
@@ -376,23 +364,32 @@ def get_restaurant_suggestions(period: Dict) -> List[Dict]:
         print("  Restaurants : CACHE HIT")
         return cached
 
-    print("  Restaurants : CACHE MISS → Foursquare API")
+    print("  Restaurants : liste Michelin/Gault&Millau")
 
-    # Récupérer les restaurants depuis Foursquare
-    all_restaurants = _fetch_restaurants_from_foursquare()
+    # Récupérer tous les restaurants avec scores
+    all_restaurants = get_restaurants(period, profile)
 
     if not all_restaurants:
-        print("  ⚠ Aucun restaurant trouvé via Foursquare")
+        print("  ⚠ Aucun restaurant dans la liste")
         return []
 
-    # Déduplication : récupérer les restaurants déjà visités
+    # Déduplication avec historique utilisateur
     from engine.profile import get_seen_items_normalized
     seen_restaurants = get_seen_items_normalized('restaurants', days=90)
+    available = [r for r in all_restaurants if r["title"].lower() not in seen_restaurants]
 
-    # Sélectionner le mix de 3 restaurants
-    selected = _select_mix_restaurants(all_restaurants, seen_restaurants)
+    if not available:
+        available = all_restaurants  # Fallback si tous vus
 
-    print(f"  Restaurants : {len(selected)} sélectionnés sur {len(all_restaurants)} trouvés")
+    # Sélectionner les 3 meilleurs
+    selected = available[:3]
+
+    print(f"  Restaurants : {len(selected)} sélectionnés sur {len(all_restaurants)} disponibles")
+
+    # Ajouter champs pour compatibilité template
+    for r in selected:
+        r.setdefault("rating", 0)
+        r.setdefault("reviews_count", 0)
 
     # Mettre en cache
     cache_set(cache_key, selected, CACHE_TTL.get("restaurants", 480))
@@ -405,15 +402,10 @@ def format_restaurants_context(restaurants: List[Dict]) -> str:
     if not restaurants:
         return "Restaurants : aucune suggestion disponible."
 
-    lines = ["Restaurants recommandés :"]
+    lines = ["Restaurants recommandés (sélection Michelin/Gault&Millau) :"]
 
-    for i, resto in enumerate(restaurants, 1):
-        rating_str = f"{resto['rating']:.1f}/5" if resto.get("rating", 0) > 0 else "N/A"
-        lines.append(f"{i}. {resto['title']} ({resto['cuisine']})")
-        lines.append(f"   Lieu : {resto['city']} ({resto['distance_km']} km)")
-        lines.append(f"   Note : {rating_str} ({resto['reviews_count']} avis)")
-        lines.append(f"   Prix : {resto['price_level']}")
-        lines.append(f"   → {resto['reason']}")
-        lines.append("")
+    for resto in restaurants:
+        lines.append(f"- {resto['title']} — {resto['city']} ({resto['distance_km']}km)")
+        lines.append(f"  {resto['distinction']} | {resto['cuisine']} | {resto['price_level']}")
 
     return "\n".join(lines)
