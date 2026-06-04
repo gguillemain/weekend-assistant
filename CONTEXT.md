@@ -1,7 +1,7 @@
 # Weekend Assistant - Contexte de reprise
 
 > Assistant personnel de loisirs pour un couple d'enseignants alsaciens (Guebwiller, Haut-Rhin).
-> Génère des suggestions de week-end basées sur la météo, les films, événements, randonnées, concerts, expositions et restaurants.
+> Génère des suggestions de week-end basées sur la météo, les films, événements, randonnées, vélo, concerts, expositions et restaurants.
 
 ## 1. Architecture du projet
 
@@ -29,6 +29,7 @@ weekend_assistant/
 │   ├── cinema.py             # Scraping Allocine + RSS Télérama/Cahiers (cache 6h)
 │   ├── events.py             # Scraping JDS, Strasbourg, Visit Alsace (cache 6h)
 │   ├── hiking.py             # Scraping Visorando (cache 24h)
+│   ├── cycling.py            # Scraping alsaceavelo.fr (cache 48h)
 │   ├── travel.py             # Destinations city break / Eurotrip
 │   ├── concerts.py           # Ticketmaster API FR/CH/DE, 180km (cache 6h)
 │   ├── exhibitions.py        # Scraping fondations/musées, 6 sources (cache 12h)
@@ -59,6 +60,7 @@ weekend_assistant/
 | `cinema.py` | 3 cinémas : Le Florival, Bel-Air, Le Palace | RSS Télérama strict (★★★★+), cache 6h |
 | `events.py` | JDS Alsace, Strasbourg.eu, Visit Alsace | RSS + fallback scraping, cache 6h |
 | `hiking.py` | Visorando Haut-Rhin | Filtrage dénivelé max 300m, cache 24h |
+| `cycling.py` | alsaceavelo.fr boucles locales | VAE 40-65km, dénivelé max 600m, cache 48h |
 | `concerts.py` | Ticketmaster API (FR/CH/DE) | Rayon 180km, déduplication, cache 6h |
 | `exhibitions.py` | 6 sources : Beyeler, Schneider, Fernet-Branca, Würth, Strasbourg, Kunstmuseum | profile_match, cache 12h |
 | `discovery.py` | DNA RSS (4 feeds), Tourisme Alsace, OpenAgenda, Freiburg | surprise_score, cache 4h |
@@ -98,6 +100,7 @@ weekend_assistant/
 | exhibitions | 12h | Expositions changent peu |
 | restaurants | 8h | Données stables, mix renouvelé |
 | hiking | 24h | Sentiers très stables |
+| cycling | 48h | Itinéraires vélo très stables |
 
 ### Performance mesurée
 
@@ -169,6 +172,29 @@ curl -X DELETE http://127.0.0.1:5000/cache-clear?mode=expired
 
 **Déduplication** : Restaurants vus exclus pendant 90 jours.
 
+### cycling.py (1 source)
+
+| Source | Type | Données |
+|--------|------|---------|
+| alsaceavelo.fr | Scraping | Boucles locales Alsace |
+
+**Filtres appliqués** :
+- Distance : 40-65km (configurable via BIKE_PREFS)
+- Dénivelé : max 600m (VAE)
+- Exclus : VTT, Gravel
+- Préférence : voies cyclables sécurisées
+
+**Scoring bike_score** (0-1) :
+- Weather favorable : +0.30
+- Boucle : +0.25
+- Distance idéale (45-60km) : +0.25
+- Proximité départ (<30km) : +0.15
+- Terrain vignoble : +0.10
+
+**Terrain détecté** : vignoble, rhin, plaine, vallée
+
+**Déduplication** : Itinéraires vus exclus pendant 90 jours.
+
 ## 5. Problèmes connus et contournements
 
 ### Télérama false positives
@@ -205,6 +231,7 @@ curl -X DELETE http://127.0.0.1:5000/cache-clear?mode=expired
 - [x] Sources Discovery + OpenAgenda
 - [x] Sources allemandes (Freiburg)
 - [x] Restaurants liste Michelin/Gault&Millau
+- [x] Vélo alsaceavelo.fr (boucles locales VAE)
 
 ### Phase 6 - Améliorations
 - [ ] Visorando : notes, photos, GPX
@@ -270,19 +297,19 @@ open http://127.0.0.1:5001/test-email
 
 ```python
 CITY_DISTANCES = {
-    # Alsace
-    "Guebwiller": 0, "Wattwiller": 10, "Wittelsheim": 12,
-    "Mulhouse": 25, "Colmar": 25, "Saint-Louis": 38, "Erstein": 58,
+    # Alsace - proches
+    "Guebwiller": 0, "Soultz-Haut-Rhin": 5, "Rouffach": 8,
+    "Wattwiller": 10, "Wittelsheim": 12, "Thann": 12, "Cernay": 15,
+    "Munster": 20, "Eguisheim": 20, "Turckheim": 22,
+    "Mulhouse": 25, "Colmar": 25, "Blodelsheim": 25, "Neuf-Brisach": 30,
+    "Saint-Louis": 38, "Oltingue": 40, "Huningue": 45, "Erstein": 58,
     "Strasbourg": 100,
     # Suisse
     "Bâle": 45, "Basel": 45, "Riehen": 40,
-    # Allemagne - Bade-Wurtemberg
-    "Freiburg": 50, "Breisach": 35, "Emmendingen": 55,
-    "Offenburg": 75, "Lahr": 65, "Kehl": 90,
-    "Baden-Baden": 100, "Lörrach": 50, "Weil am Rhein": 45,
-    "Bad Krozingen": 45,
+    # Allemagne
+    "Freiburg": 50, "Breisach": 35, "Bad Krozingen": 45,
     # France - autres
-    "Belfort": 55, "Besançon": 120, "Nancy": 150
+    "Belfort": 55, "Besançon": 120
 }
 ```
 
@@ -323,4 +350,4 @@ expo_fondations: [
 ---
 
 *Dernière mise à jour : 04/06/2026*
-*Commits : ba235c2 (MVP) → 15878cd (cache SQLite) → 4220b28 (Freiburg) → 9b6d0b6 (restaurants Michelin)*
+*Commits : ba235c2 (MVP) → 15878cd (cache SQLite) → 9b6d0b6 (restaurants) → 8693442 (vélo)*

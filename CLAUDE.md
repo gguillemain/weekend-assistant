@@ -2,7 +2,7 @@
 
 ## Vue d'ensemble
 
-Application Flask de suggestions d'activités pour le week-end (région Alsace/Bâle). Collecte des données de plusieurs sources (cinéma, concerts, expos, randonnées, restaurants, météo) et propose des recommandations personnalisées.
+Application Flask de suggestions d'activités pour le week-end (région Alsace/Bâle). Collecte des données de plusieurs sources (cinéma, concerts, expos, randonnées, vélo, restaurants, météo) et propose des recommandations personnalisées.
 
 ## Architecture
 
@@ -16,6 +16,7 @@ weekend_assistant/
 │   ├── exhibitions.py     # Expositions (scraping musées)
 │   ├── events.py          # Événements locaux (JDS, Strasbourg.eu)
 │   ├── hiking.py          # Randonnées (Visorando scraping)
+│   ├── cycling.py         # Vélo (alsaceavelo.fr scraping)
 │   ├── restaurants.py     # Restaurants (liste Michelin/Gault&Millau)
 │   ├── discovery.py       # Découvertes diverses
 │   └── weather.py         # Météo (API OpenWeatherMap)
@@ -115,7 +116,7 @@ SQLite stockée dans `data/preferences.db` (volume Docker monté).
 
 ### Tables principales
 
-- **activity_log** : Historique des activités (films vus, concerts, expos, randos, restaurants)
+- **activity_log** : Historique des activités (films, concerts, expos, randos, vélo, restaurants)
 - **suggestion_feedback** : Feedback utilisateur sur les suggestions
 - **user_profile** : Préférences utilisateur
 
@@ -123,7 +124,7 @@ SQLite stockée dans `data/preferences.db` (volume Docker monté).
 
 Les collectors utilisent `get_seen_items_normalized()` pour éviter de re-suggérer des éléments déjà vus :
 - Concerts/Expos : 365 jours
-- Randonnées/Restaurants : 90 jours
+- Randonnées/Vélo/Restaurants : 90 jours
 - Discovery : 180 jours
 
 ## Points d'attention
