@@ -1,373 +1,359 @@
 """
-Module de collecte de restaurants via scraping.
-Sources : Visit Alsace (principale), compléments locaux.
-Aucune API tierce - uniquement requests + BeautifulSoup.
+Module de collecte de restaurants — Liste statique Michelin/Gault&Millau.
+Mise à jour annuelle (mars) basée sur les guides officiels.
+Aucun scraping, aucune API — données fiables et stables.
 """
 
-import requests
-from bs4 import BeautifulSoup
 from typing import Dict, List
-import re
+import config
 from engine.cache import cache_get, cache_set, CACHE_TTL
 
 
-# Coordonnées de Guebwiller
-GUEBWILLER_LAT = 47.9069
-GUEBWILLER_LON = 7.2147
+# =============================================================================
+# LISTE STATIQUE — MISE À JOUR ANNUELLE (MARS 2026)
+# =============================================================================
 
-# User-Agent
-HEADERS = {
-    "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
-    "Accept-Language": "fr-FR,fr;q=0.9,en;q=0.8",
-}
+BIB_GOURMAND_ALSACE = [
+    # -------------------------------------------------------------------------
+    # Haut-Rhin — proches de Guebwiller
+    # -------------------------------------------------------------------------
+    {
+        "name": "L'AO – L'Aigle d'Or",
+        "city": "Rimbach-près-Guebwiller",
+        "cuisine": "alsacienne",
+        "price": "€€",
+        "distinction": "Bib Gourmand",
+        "url": "https://guide.michelin.com/fr/fr/alsace/rimbach-pres-guebwiller/restaurant/l-ao-l-aigle-d-or"
+    },
+    {
+        "name": "L'Arbre Vert",
+        "city": "Bernwiller",
+        "cuisine": "alsacienne",
+        "price": "€€",
+        "distinction": "Bib Gourmand",
+        "url": "https://guide.michelin.com/fr/fr/alsace/bernwiller/restaurant/l-arbre-vert"
+    },
+    {
+        "name": "Perle des Vosges",
+        "city": "Muhlbach-sur-Munster",
+        "cuisine": "régionale",
+        "price": "€€",
+        "distinction": "Bib Gourmand",
+        "url": "https://guide.michelin.com/fr/fr/alsace/muhlbach-sur-munster/restaurant/perle-des-vosges"
+    },
+    {
+        "name": "La Taverne Alsacienne",
+        "city": "Ingersheim",
+        "cuisine": "alsacienne",
+        "price": "€€",
+        "distinction": "Bib Gourmand",
+        "url": "https://guide.michelin.com/fr/fr/alsace/ingersheim/restaurant/la-taverne-alsacienne"
+    },
+    {
+        "name": "La Vieille Forge",
+        "city": "Kaysersberg",
+        "cuisine": "alsacienne",
+        "price": "€€",
+        "distinction": "Bib Gourmand",
+        "url": "https://guide.michelin.com/fr/fr/alsace/kaysersberg-vignoble/restaurant/la-vieille-forge"
+    },
+    {
+        "name": "Winstub du Chambard",
+        "city": "Kaysersberg",
+        "cuisine": "winstub",
+        "price": "€€",
+        "distinction": "Bib Gourmand",
+        "url": "https://guide.michelin.com/fr/fr/alsace/kaysersberg-vignoble/restaurant/winstub-du-chambard"
+    },
+    {
+        "name": "La Rochette",
+        "city": "Labaroche",
+        "cuisine": "régionale",
+        "price": "€€",
+        "distinction": "Bib Gourmand",
+        "url": "https://guide.michelin.com/fr/fr/alsace/labaroche/restaurant/la-rochette"
+    },
+    {
+        "name": "Les Grands Arbres – Verte Vallée",
+        "city": "Munster",
+        "cuisine": "gastronomique",
+        "price": "€€",
+        "distinction": "Bib Gourmand",
+        "url": "https://guide.michelin.com/fr/fr/alsace/munster/restaurant/les-grands-arbres-verte-vallee"
+    },
+    {
+        "name": "L'Olivier",
+        "city": "Munster",
+        "cuisine": "bistronomique",
+        "price": "€€",
+        "distinction": "Bib Gourmand",
+        "url": "https://guide.michelin.com/fr/fr/alsace/munster/restaurant/l-olivier"
+    },
+    {
+        "name": "Au Relais des Ménétriers",
+        "city": "Ribeauvillé",
+        "cuisine": "alsacienne",
+        "price": "€€",
+        "distinction": "Bib Gourmand",
+        "url": "https://guide.michelin.com/fr/fr/alsace/ribeauville/restaurant/au-relais-des-menetriers"
+    },
+    {
+        "name": "Le Pressoir de Bacchus",
+        "city": "Blienschwiller",
+        "cuisine": "alsacienne",
+        "price": "€€",
+        "distinction": "Bib Gourmand",
+        "url": "https://guide.michelin.com/fr/fr/alsace/blienschwiller/restaurant/le-pressoir-de-bacchus"
+    },
+    {
+        "name": "Winstub A Côté",
+        "city": "Sierentz",
+        "cuisine": "winstub",
+        "price": "€",
+        "distinction": "Bib Gourmand",
+        "url": "https://guide.michelin.com/fr/fr/alsace/sierentz/restaurant/winstub-a-cote"
+    },
+    {
+        "name": "Au Lion d'Or – chez Théo",
+        "city": "Rosenau",
+        "cuisine": "alsacienne",
+        "price": "€€",
+        "distinction": "Bib Gourmand",
+        "url": "https://guide.michelin.com/fr/fr/alsace/rosenau/restaurant/au-lion-d-or-chez-theo"
+    },
 
-# Villes alsaciennes (Haut-Rhin et Bas-Rhin)
-ALSACE_CITIES = [
-    "Strasbourg", "Colmar", "Mulhouse", "Ribeauvillé", "Riquewihr", "Obernai",
-    "Sélestat", "Haguenau", "Saverne", "Wissembourg", "Kaysersberg", "Guebwiller",
-    "Thann", "Rouffach", "Soultz", "Munster", "Barr", "Molsheim", "Illkirch",
-    "Schiltigheim", "Bischheim", "Lingolsheim", "Hoenheim", "Ostwald", "Illzach",
-    "Wittenheim", "Kingersheim", "Rixheim", "Riedisheim", "Pfastatt", "Cernay",
-    "Ensisheim", "Altkirch", "Saint-Louis", "Huningue", "Wintzenheim", "Turckheim",
-    "Ammerschwihr", "Eguisheim", "Bergheim", "Marlenheim", "Wasselonne", "Brumath",
-    "Lauterbourg", "Murbach", "Wattwiller", "Bollwiller", "Issenheim", "Buhl",
-    "Soultzbach", "Soultzmatt", "Westhalten", "Orschwihr", "Pfaffenheim", "Hattstatt",
-    "Husseren", "Voegtlinshoffen", "Obermorschwihr", "Herrlisheim", "Niederhergheim",
-    "Andolsheim", "Sundhoffen", "Ingersheim", "Katzenthal", "Niedermorschwihr",
-    "Ammerschwihr", "Kientzheim", "Sigolsheim", "Bennwihr", "Mittelwihr", "Beblenheim"
+    # -------------------------------------------------------------------------
+    # Colmar
+    # -------------------------------------------------------------------------
+    {
+        "name": "L'Atelier du Peintre",
+        "city": "Colmar",
+        "cuisine": "gastronomique",
+        "price": "€€€",
+        "distinction": "1 étoile Michelin",
+        "url": "https://guide.michelin.com/fr/fr/alsace/colmar/restaurant/l-atelier-du-peintre"
+    },
+    {
+        "name": "Wistub Brenner",
+        "city": "Colmar",
+        "cuisine": "winstub",
+        "price": "€€",
+        "distinction": "recommandé",
+        "url": "https://www.wistub-brenner.fr"
+    },
+
+    # -------------------------------------------------------------------------
+    # Mulhouse
+    # -------------------------------------------------------------------------
+    {
+        "name": "Le Gavroche",
+        "city": "Mulhouse",
+        "cuisine": "bistronomique",
+        "price": "€€",
+        "distinction": "recommandé",
+        "url": "https://www.restaurant-gavroche-mulhouse.fr"
+    },
+
+    # -------------------------------------------------------------------------
+    # Strasbourg
+    # -------------------------------------------------------------------------
+    {
+        "name": "Chez Yvonne – S'Burjerstuewel",
+        "city": "Strasbourg",
+        "cuisine": "winstub",
+        "price": "€€",
+        "distinction": "Bib Gourmand",
+        "url": "https://guide.michelin.com/fr/fr/alsace/strasbourg/restaurant/chez-yvonne-s-burjerstuewel"
+    },
+    {
+        "name": "Au Pont du Corbeau",
+        "city": "Strasbourg",
+        "cuisine": "alsacienne",
+        "price": "€€",
+        "distinction": "Bib Gourmand",
+        "url": "https://guide.michelin.com/fr/fr/alsace/strasbourg/restaurant/au-pont-du-corbeau"
+    },
+
+    # -------------------------------------------------------------------------
+    # Bâle (Suisse)
+    # -------------------------------------------------------------------------
+    {
+        "name": "Kunsthalle Restaurant",
+        "city": "Bâle",
+        "cuisine": "bistronomique",
+        "price": "€€",
+        "distinction": "recommandé",
+        "url": "https://www.kunsthallebasel.ch/restaurant"
+    },
+    {
+        "name": "Chez Donati",
+        "city": "Bâle",
+        "cuisine": "italienne",
+        "price": "€€€",
+        "distinction": "recommandé Gault&Millau",
+        "url": "https://www.donati.ch"
+    },
 ]
 
-# Codes postaux Alsace (67xxx et 68xxx)
-ALSACE_POSTCODES = ["67", "68"]
+
+# =============================================================================
+# DISTANCES DEPUIS GUEBWILLER (en km)
+# Complète config.CITY_DISTANCES pour les petites communes
+# =============================================================================
+
+RESTAURANT_DISTANCES = {
+    # Proches de Guebwiller (< 20km)
+    "Rimbach-près-Guebwiller": 5,
+    "Bernwiller": 12,
+    "Muhlbach-sur-Munster": 18,
+    "Ingersheim": 22,
+    "Kaysersberg": 28,
+    "Labaroche": 35,
+    "Munster": 20,
+    "Ribeauvillé": 35,
+    "Blienschwiller": 45,
+    "Sierentz": 30,
+    "Rosenau": 42,
+    # Villes principales
+    "Colmar": 25,
+    "Mulhouse": 25,
+    "Strasbourg": 100,
+    "Bâle": 45,
+    "Basel": 45,
+}
 
 
-def _is_alsace_location(text: str) -> bool:
-    """Vérifie si le texte contient une localisation alsacienne."""
-    if not text:
-        return False
-    text_lower = text.lower()
-
-    # Vérifier les villes
-    for city in ALSACE_CITIES:
-        if city.lower() in text_lower:
-            return True
-
-    # Vérifier les codes postaux (67xxx ou 68xxx)
-    postcode_match = re.search(r'\b(67\d{3}|68\d{3})\b', text)
-    if postcode_match:
-        return True
-
-    # Vérifier mentions explicites
-    if any(x in text_lower for x in ["alsace", "haut-rhin", "bas-rhin"]):
-        return True
-
-    return False
+def _get_distance(city: str) -> int:
+    """Retourne la distance depuis Guebwiller."""
+    # D'abord chercher dans notre liste locale
+    if city in RESTAURANT_DISTANCES:
+        return RESTAURANT_DISTANCES[city]
+    # Sinon dans config.CITY_DISTANCES
+    if hasattr(config, 'CITY_DISTANCES') and city in config.CITY_DISTANCES:
+        return config.CITY_DISTANCES[city]
+    # Défaut
+    return 50
 
 
-def _extract_city(text: str) -> str:
-    """Extrait une ville alsacienne depuis un texte."""
-    if not text:
-        return "Alsace"
-    text_lower = text.lower()
-    for city in ALSACE_CITIES:
-        if city.lower() in text_lower:
-            return city
-    return "Alsace"
-
-
-def _fetch_visitalsace_restaurants() -> List[Dict]:
+def _calculate_value_score(restaurant: Dict) -> float:
     """
-    Scrape les restaurants depuis Visit Alsace (tourisme officiel).
-    Source principale et fiable.
+    Calcule le score de valeur d'un restaurant.
+    Plus le score est élevé, plus le restaurant est recommandé.
     """
-    url = "https://www.visit.alsace/gastronomie/restaurants/"
+    score = 0.0
+
+    # Distinction
+    distinction = restaurant.get("distinction", "").lower()
+    if "bib gourmand" in distinction:
+        score += 0.4
+    elif "étoile" in distinction or "etoile" in distinction:
+        score += 0.3
+    elif "recommandé" in distinction or "recommande" in distinction:
+        score += 0.2
+
+    # Prix (bon rapport qualité/prix)
+    price = restaurant.get("price", "€€")
+    if price == "€":
+        score += 0.2
+    elif price == "€€":
+        score += 0.1
+
+    # Distance (proximité favorisée)
+    distance = restaurant.get("distance_km", 50)
+    if distance < 15:
+        score += 0.3
+    elif distance < 30:
+        score += 0.2
+    elif distance < 50:
+        score += 0.1
+
+    # Cuisine (winstub et alsacienne favorisées)
+    cuisine = restaurant.get("cuisine", "").lower()
+    if cuisine in ["winstub", "alsacienne"]:
+        score += 0.1
+
+    return round(score, 2)
+
+
+def _calculate_profile_match(restaurant: Dict, profile: Dict) -> float:
+    """
+    Calcule la correspondance avec le profil utilisateur.
+    Pour l'instant, retourne 0.5 par défaut.
+    Sera affiné avec le feedback utilisateur.
+    """
+    # TODO: Affiner avec les préférences gastronomiques du profil
+    # - cuisines préférées
+    # - gamme de prix
+    # - types de sorties (winstub vs gastro)
+    return 0.5
+
+
+def get_restaurants(period: Dict, profile: Dict = None) -> List[Dict]:
+    """
+    Retourne la liste des restaurants triée par value_score.
+
+    Args:
+        period: Période (pour le cache)
+        profile: Profil utilisateur (optionnel)
+
+    Returns:
+        Liste de restaurants avec scores calculés
+    """
+    if profile is None:
+        profile = {}
+
+    # Construire la liste avec scores
     restaurants = []
 
-    print(f"\n  [VISITALSACE] Scraping {url}")
+    for resto in BIB_GOURMAND_ALSACE:
+        distance = _get_distance(resto["city"])
 
-    try:
-        response = requests.get(url, headers=HEADERS, timeout=15)
-        print(f"  [VISITALSACE] Status HTTP: {response.status_code}")
+        restaurant = {
+            "title": resto["name"],
+            "city": resto["city"],
+            "cuisine": resto["cuisine"],
+            "price_level": resto["price"],
+            "distinction": resto["distinction"],
+            "url": resto["url"],
+            "distance_km": distance,
+            "source": "Guide Michelin",
+        }
 
-        if response.status_code != 200:
-            print(f"  [VISITALSACE] Erreur HTTP {response.status_code}")
-            return []
+        # Calculer les scores
+        restaurant["value_score"] = _calculate_value_score(restaurant)
+        restaurant["profile_match"] = _calculate_profile_match(restaurant, profile)
 
-        soup = BeautifulSoup(response.text, "html.parser")
-        print(f"  [VISITALSACE] HTML (300 premiers chars):\n{response.text[:300]}\n")
+        # Raison de la recommandation
+        if "Bib Gourmand" in resto["distinction"]:
+            restaurant["reason"] = f"Bib Gourmand — {resto['cuisine']} à {distance}km"
+        elif "étoile" in resto["distinction"]:
+            restaurant["reason"] = f"⭐ {resto['distinction']} — {resto['cuisine']}"
+        else:
+            restaurant["reason"] = f"{resto['distinction']} — {resto['cuisine']}"
 
-        # Visit Alsace utilise des cartes SIT
-        cards = soup.select("article, .card, .item, [class*='card'], [class*='result'], .sit-item, .poi")
-        print(f"  [VISITALSACE] Cartes trouvées: {len(cards)}")
+        restaurants.append(restaurant)
 
-        seen = set()
+    # Trier par value_score décroissant
+    restaurants.sort(key=lambda r: r["value_score"], reverse=True)
 
-        for card in cards[:30]:
-            try:
-                name_el = card.select_one("h2, h3, .title, .name, a[href*='restaurant'], a[href*='gastronomie']")
-                name = name_el.get_text(strip=True) if name_el else None
+    # Afficher le top 5 pour debug
+    print("\n  [RESTAURANTS] Top 5 par value_score :")
+    for i, r in enumerate(restaurants[:5], 1):
+        print(f"    {i}. {r['title']} ({r['city']}) — {r['distance_km']}km — {r['distinction']} — score={r['value_score']}")
 
-                if not name or len(name) < 3:
-                    continue
+    # Vérifier que L'Aigle d'Or apparaît bien en tête
+    if restaurants and "Aigle d'Or" in restaurants[0]["title"]:
+        print("  ✓ L'Aigle d'Or (Rimbach) en tête comme attendu")
+    else:
+        print(f"  ⚠ Premier résultat: {restaurants[0]['title'] if restaurants else 'aucun'}")
 
-                # Filtrer les noms génériques
-                if name.lower() in ['voir plus', 'découvrir', 'restaurants', 'en savoir plus', 'alsace', 'gastronomie']:
-                    continue
-
-                # Nettoyer le nom (enlever préfixes comme "Maître restaurateur")
-                name = re.sub(r'^(Maître restaurateur|Restaurant)\s*', '', name).strip()
-
-                if name.lower() in seen or len(name) < 3:
-                    continue
-                seen.add(name.lower())
-
-                city = _extract_city(card.get_text())
-
-                link_el = card.select_one("a[href]")
-                href = link_el.get("href", "") if link_el else ""
-                full_url = href if href.startswith("http") else f"https://www.visit.alsace{href}"
-
-                restaurants.append({
-                    "title": name,
-                    "city": city,
-                    "cuisine": "Alsacien",
-                    "source": "Visit Alsace",
-                    "url": full_url,
-                    "reason": "Recommandé par Visit Alsace"
-                })
-                print(f"  [VISITALSACE] Trouvé: {name} ({city})")
-
-            except Exception as e:
-                continue
-
-    except requests.exceptions.RequestException as e:
-        print(f"  [VISITALSACE] Erreur requête: {e}")
-
-    print(f"  [VISITALSACE] Total: {len(restaurants)} restaurants")
     return restaurants
 
 
-def _fetch_jds_restaurants() -> List[Dict]:
-    """
-    Scrape les restaurants depuis JDS (Journal Des Spectacles) Alsace.
-    """
-    url = "https://www.jds.fr/gastronomie/restaurants/restaurants-gastronomiques-alsace-13255_L"
-    restaurants = []
-
-    print(f"\n  [JDS] Scraping {url}")
-
-    try:
-        response = requests.get(url, headers=HEADERS, timeout=15)
-        print(f"  [JDS] Status HTTP: {response.status_code}")
-        print(f"  [JDS] HTML (300 premiers chars):\n{response.text[:300]}\n")
-
-        if response.status_code != 200:
-            print(f"  [JDS] Erreur HTTP {response.status_code}")
-            return []
-
-        soup = BeautifulSoup(response.text, "html.parser")
-
-        # JDS utilise des cartes avec classe spécifique
-        cards = soup.select("article, .card, .item, .poi, [class*='listing'], [class*='result']")
-        print(f"  [JDS] Cartes trouvées: {len(cards)}")
-
-        # Aussi chercher les liens
-        links = soup.select("a[href*='restaurant'], a[href*='gastronomie']")
-        print(f"  [JDS] Liens restaurants: {len(links)}")
-
-        seen = set()
-
-        for card in cards[:20]:
-            try:
-                name_el = card.select_one("h2, h3, .title, .name, a")
-                name = name_el.get_text(strip=True) if name_el else None
-
-                if not name or len(name) < 3 or name.lower() in seen:
-                    continue
-
-                if name.lower() in ['voir plus', 'en savoir plus', 'restaurants']:
-                    continue
-
-                seen.add(name.lower())
-                city = _extract_city(card.get_text())
-
-                link_el = card.select_one("a[href]")
-                href = link_el.get("href", "") if link_el else ""
-                full_url = href if href.startswith("http") else f"https://www.jds.fr{href}"
-
-                restaurants.append({
-                    "title": name,
-                    "city": city,
-                    "cuisine": "Gastronomique",
-                    "source": "JDS",
-                    "url": full_url,
-                    "reason": "Sélection JDS Alsace"
-                })
-                print(f"  [JDS] Trouvé: {name} ({city})")
-
-            except Exception:
-                continue
-
-    except requests.exceptions.RequestException as e:
-        print(f"  [JDS] Erreur requête: {e}")
-
-    print(f"  [JDS] Total: {len(restaurants)} restaurants")
-    return restaurants
-
-
-def _fetch_tourisme68_restaurants() -> List[Dict]:
-    """
-    Scrape les restaurants depuis Tourisme68 (ADT Haut-Rhin).
-    """
-    url = "https://www.tourisme68.com/restaurants-gastronomiques/"
-    restaurants = []
-
-    print(f"\n  [TOURISME68] Scraping {url}")
-
-    try:
-        response = requests.get(url, headers=HEADERS, timeout=15)
-        print(f"  [TOURISME68] Status HTTP: {response.status_code}")
-        print(f"  [TOURISME68] HTML (300 premiers chars):\n{response.text[:300]}\n")
-
-        if response.status_code != 200:
-            # Essayer URL alternative
-            alt_url = "https://www.tourisme68.com/ou-manger/"
-            print(f"  [TOURISME68] Essai URL alt: {alt_url}")
-            response = requests.get(alt_url, headers=HEADERS, timeout=15)
-            print(f"  [TOURISME68] Status alt: {response.status_code}")
-            if response.status_code != 200:
-                return []
-
-        soup = BeautifulSoup(response.text, "html.parser")
-
-        cards = soup.select("article, .card, .item, [class*='card'], [class*='result']")
-        print(f"  [TOURISME68] Cartes trouvées: {len(cards)}")
-
-        seen = set()
-
-        for card in cards[:20]:
-            try:
-                name_el = card.select_one("h2, h3, .title, .name, a")
-                name = name_el.get_text(strip=True) if name_el else None
-
-                if not name or len(name) < 3 or name.lower() in seen:
-                    continue
-
-                if name.lower() in ['voir plus', 'en savoir plus', 'restaurants', 'découvrir']:
-                    continue
-
-                seen.add(name.lower())
-                city = _extract_city(card.get_text())
-
-                link_el = card.select_one("a[href]")
-                href = link_el.get("href", "") if link_el else ""
-                full_url = href if href.startswith("http") else f"https://www.tourisme68.com{href}"
-
-                restaurants.append({
-                    "title": name,
-                    "city": city,
-                    "cuisine": "Gastronomique",
-                    "source": "Tourisme68",
-                    "url": full_url,
-                    "reason": "Recommandé Haut-Rhin Tourisme"
-                })
-                print(f"  [TOURISME68] Trouvé: {name} ({city})")
-
-            except Exception:
-                continue
-
-    except requests.exceptions.RequestException as e:
-        print(f"  [TOURISME68] Erreur requête: {e}")
-
-    print(f"  [TOURISME68] Total: {len(restaurants)} restaurants")
-    return restaurants
-
-
-def _fetch_strasbourg_restaurants() -> List[Dict]:
-    """
-    Scrape les restaurants depuis Visit Strasbourg.
-    """
-    url = "https://www.visitstrasbourg.fr/decouvrir-strasbourg/gastronomie/restaurants-gastronomiques/"
-    restaurants = []
-
-    print(f"\n  [STRASBOURG] Scraping {url}")
-
-    try:
-        response = requests.get(url, headers=HEADERS, timeout=15)
-        print(f"  [STRASBOURG] Status HTTP: {response.status_code}")
-        print(f"  [STRASBOURG] HTML (300 premiers chars):\n{response.text[:300]}\n")
-
-        if response.status_code != 200:
-            # URL alternative
-            alt_url = "https://www.visitstrasbourg.fr/decouvrir-strasbourg/gastronomie/"
-            print(f"  [STRASBOURG] Essai URL alt: {alt_url}")
-            response = requests.get(alt_url, headers=HEADERS, timeout=15)
-            print(f"  [STRASBOURG] Status alt: {response.status_code}")
-            if response.status_code != 200:
-                return []
-
-        soup = BeautifulSoup(response.text, "html.parser")
-
-        cards = soup.select("article, .card, .item, [class*='card'], [class*='result'], .poi")
-        print(f"  [STRASBOURG] Cartes trouvées: {len(cards)}")
-
-        seen = set()
-
-        for card in cards[:15]:
-            try:
-                name_el = card.select_one("h2, h3, .title, .name, a")
-                name = name_el.get_text(strip=True) if name_el else None
-
-                if not name or len(name) < 3 or name.lower() in seen:
-                    continue
-
-                if name.lower() in ['voir plus', 'en savoir plus', 'restaurants', 'découvrir']:
-                    continue
-
-                seen.add(name.lower())
-
-                link_el = card.select_one("a[href]")
-                href = link_el.get("href", "") if link_el else ""
-                full_url = href if href.startswith("http") else f"https://www.visitstrasbourg.fr{href}"
-
-                restaurants.append({
-                    "title": name,
-                    "city": "Strasbourg",
-                    "cuisine": "Gastronomique",
-                    "source": "Visit Strasbourg",
-                    "url": full_url,
-                    "reason": "Gastronomie strasbourgeoise"
-                })
-                print(f"  [STRASBOURG] Trouvé: {name}")
-
-            except Exception:
-                continue
-
-    except requests.exceptions.RequestException as e:
-        print(f"  [STRASBOURG] Erreur requête: {e}")
-
-    print(f"  [STRASBOURG] Total: {len(restaurants)} restaurants")
-    return restaurants
-
-
-def _deduplicate_restaurants(restaurants: List[Dict]) -> List[Dict]:
-    """Supprime les doublons par nom de restaurant (normalisation)."""
-    seen = set()
-    unique = []
-    for r in restaurants:
-        # Normaliser le nom
-        name_normalized = re.sub(r'[^a-z0-9]', '', r["title"].lower())
-        if name_normalized not in seen and len(name_normalized) > 2:
-            seen.add(name_normalized)
-            unique.append(r)
-    return unique
-
-
-def get_restaurant_suggestions(period: Dict) -> List[Dict]:
+def get_restaurant_suggestions(period: Dict, profile: Dict = None) -> List[Dict]:
     """
     Récupère les suggestions de restaurants pour une période donnée.
-    Scrape Visit Alsace, JDS, Tourisme68, Visit Strasbourg.
+    Wrapper pour compatibilité avec le reste du code.
     """
     period_start = period.get("start", "")
     cache_key = f"restaurants_{period_start}"
@@ -378,30 +364,13 @@ def get_restaurant_suggestions(period: Dict) -> List[Dict]:
         print("  Restaurants : CACHE HIT")
         return cached
 
-    print("  Restaurants : CACHE MISS → scraping sites tourisme Alsace")
+    print("  Restaurants : liste Michelin/Gault&Millau")
 
-    all_restaurants = []
-
-    # Scraper les sources (ordre de priorité)
-    visitalsace = _fetch_visitalsace_restaurants()
-    all_restaurants.extend(visitalsace)
-
-    jds = _fetch_jds_restaurants()
-    all_restaurants.extend(jds)
-
-    tourisme68 = _fetch_tourisme68_restaurants()
-    all_restaurants.extend(tourisme68)
-
-    strasbourg = _fetch_strasbourg_restaurants()
-    all_restaurants.extend(strasbourg)
-
-    # Dédupliquer
-    all_restaurants = _deduplicate_restaurants(all_restaurants)
-
-    print(f"\n  [TOTAL] {len(all_restaurants)} restaurants uniques trouvés")
+    # Récupérer tous les restaurants avec scores
+    all_restaurants = get_restaurants(period, profile)
 
     if not all_restaurants:
-        print("  ⚠ Aucun restaurant trouvé via scraping")
+        print("  ⚠ Aucun restaurant dans la liste")
         return []
 
     # Déduplication avec historique utilisateur
@@ -410,31 +379,17 @@ def get_restaurant_suggestions(period: Dict) -> List[Dict]:
     available = [r for r in all_restaurants if r["title"].lower() not in seen_restaurants]
 
     if not available:
-        available = all_restaurants
+        available = all_restaurants  # Fallback si tous vus
 
-    # Sélectionner 3 restaurants avec priorité aux sources locales
-    selected = []
-    priority_sources = ["Visit Alsace", "JDS", "Tourisme68", "Visit Strasbourg"]
+    # Sélectionner les 3 meilleurs
+    selected = available[:3]
 
-    for source in priority_sources:
-        for r in available:
-            if r["source"] == source and r not in selected and len(selected) < 3:
-                selected.append(r)
-                break
-
-    # Compléter si moins de 3
-    for r in available:
-        if r not in selected and len(selected) < 3:
-            selected.append(r)
-
-    print(f"  Restaurants : {len(selected)} sélectionnés sur {len(all_restaurants)} trouvés")
+    print(f"  Restaurants : {len(selected)} sélectionnés sur {len(all_restaurants)} disponibles")
 
     # Ajouter champs pour compatibilité template
     for r in selected:
-        r.setdefault("distance_km", 0)
         r.setdefault("rating", 0)
         r.setdefault("reviews_count", 0)
-        r.setdefault("price_level", "€€€")
 
     # Mettre en cache
     cache_set(cache_key, selected, CACHE_TTL.get("restaurants", 480))
@@ -447,13 +402,10 @@ def format_restaurants_context(restaurants: List[Dict]) -> str:
     if not restaurants:
         return "Restaurants : aucune suggestion disponible."
 
-    lines = ["Restaurants recommandés (guides locaux Alsace) :"]
+    lines = ["Restaurants recommandés (sélection Michelin/Gault&Millau) :"]
 
-    for i, resto in enumerate(restaurants, 1):
-        lines.append(f"{i}. {resto['title']} ({resto.get('cuisine', 'Gastronomique')})")
-        lines.append(f"   Lieu : {resto.get('city', 'Alsace')}")
-        lines.append(f"   Source : {resto.get('source', 'Guide')}")
-        lines.append(f"   → {resto.get('reason', 'Recommandé')}")
-        lines.append("")
+    for resto in restaurants:
+        lines.append(f"- {resto['title']} — {resto['city']} ({resto['distance_km']}km)")
+        lines.append(f"  {resto['distinction']} | {resto['cuisine']} | {resto['price_level']}")
 
     return "\n".join(lines)
