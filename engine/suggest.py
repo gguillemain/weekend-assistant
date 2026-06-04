@@ -403,17 +403,6 @@ def generate_suggestions(period: Dict) -> Dict:
         system_prompt = BASE_SYSTEM_PROMPT.format(profile_section=profile_section)
         travel_data = {}
 
-    # DEBUG : Afficher le prompt complet envoyé à Claude
-    print("\n" + "="*80)
-    print("DEBUG — PROMPT SYSTÈME ENVOYÉ À CLAUDE :")
-    print("="*80)
-    print(system_prompt)
-    print("\n" + "="*80)
-    print("DEBUG — PROMPT UTILISATEUR ENVOYÉ À CLAUDE :")
-    print("="*80)
-    print(user_prompt[:3000] + "..." if len(user_prompt) > 3000 else user_prompt)
-    print("="*80 + "\n")
-
     # Appeler Claude API
     client = anthropic.Anthropic()
 
