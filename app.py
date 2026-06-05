@@ -369,6 +369,42 @@ def test_email_route():
     return html
 
 
+@app.route("/test-travel")
+def test_travel_route():
+    """Endpoint pour tester le système de voyage sans attendre les vacances."""
+    from datetime import date, timedelta
+    from engine.travel_engine import generate_travel_suggestions
+
+    # Paramètres personnalisables via query string
+    days_ahead = int(request.args.get("days_ahead", 45))
+    duration = int(request.args.get("duration", 7))
+    max_price = float(request.args.get("max_price", 300))
+
+    # Créer une période de vacances fictive
+    start = date.today() + timedelta(days=days_ahead)
+    end = start + timedelta(days=duration)
+
+    test_period = {
+        "start": start.strftime("%Y-%m-%d"),
+        "end": end.strftime("%Y-%m-%d"),
+        "days": duration,
+        "label": f"Vacances test ({duration}j dans {days_ahead}j)",
+    }
+
+    # Générer les suggestions
+    result = generate_travel_suggestions(test_period, max_budget=max_price)
+
+    # Ajouter les paramètres utilisés
+    result["test_params"] = {
+        "days_ahead": days_ahead,
+        "duration": duration,
+        "max_price": max_price,
+        "period": test_period,
+    }
+
+    return jsonify(result)
+
+
 @app.route("/cache-stats")
 def cache_stats_route():
     """Endpoint pour voir les statistiques du cache."""
