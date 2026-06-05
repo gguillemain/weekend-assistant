@@ -391,16 +391,23 @@ def test_travel_route():
     }
 
     # Générer les suggestions
-    result = generate_travel_suggestions(test_period)
+    try:
+        result = generate_travel_suggestions(test_period)
 
-    # Ajouter les paramètres utilisés
-    result["test_params"] = {
-        "days_ahead": days_ahead,
-        "duration": duration,
-        "period": test_period,
-    }
+        # Ajouter les paramètres utilisés
+        result["test_params"] = {
+            "days_ahead": days_ahead,
+            "duration": duration,
+            "period": test_period,
+        }
 
-    return jsonify(result)
+        return jsonify(result)
+    except Exception as e:
+        import traceback
+        error_trace = traceback.format_exc()
+        print(f"[test-travel] Erreur : {e}")
+        print(error_trace)
+        return jsonify({"error": str(e), "trace": error_trace}), 500
 
 
 @app.route("/cache-stats")
