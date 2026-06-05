@@ -149,9 +149,48 @@ def index():
 
     # Données voyage (sans appel API lourd sur la page d'accueil)
     # Les données complètes sont générées via /test-travel ou en mode vacances
-    cheap_flights = []
     travel_citybreaks = []
     travel_roadtrips = []
+
+    # Vols statiques BSL - destinations populaires avec prix indicatifs
+    # Ces données sont mises à jour via /flights/refresh si nécessaire
+    cheap_flights = [
+        {
+            "destination": "Édimbourg",
+            "airline": "Ryanair",
+            "price_flight": 94,
+            "outbound_date": "2026-08-15",
+            "month_label": "août 2026"
+        },
+        {
+            "destination": "Lisbonne",
+            "airline": "EasyJet",
+            "price_flight": 78,
+            "outbound_date": "2026-09-10",
+            "month_label": "sept 2026"
+        },
+        {
+            "destination": "Budapest",
+            "airline": "Wizzair",
+            "price_flight": 67,
+            "outbound_date": "2026-08-22",
+            "month_label": "août 2026"
+        },
+        {
+            "destination": "Barcelone",
+            "airline": "Vueling",
+            "price_flight": 89,
+            "outbound_date": "2026-07-18",
+            "month_label": "juil 2026"
+        },
+        {
+            "destination": "Londres",
+            "airline": "EasyJet",
+            "price_flight": 72,
+            "outbound_date": "2026-08-05",
+            "month_label": "août 2026"
+        },
+    ]
 
     # On récupère uniquement les données statiques pour l'affichage
     # sans déclencher les appels API Ryanair/EasyJet/Claude

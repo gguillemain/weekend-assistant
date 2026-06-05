@@ -1710,6 +1710,56 @@
             text-overflow: ellipsis;
         }
 
+        /* Flights sidebar */
+        .flights-sidebar {
+            background: var(--white);
+            border-radius: var(--border-radius-md);
+            padding: 12px;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.05);
+        }
+
+        .flight-sidebar-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 6px 0;
+            border-bottom: 0.5px solid var(--gray-light);
+        }
+
+        .flight-sidebar-row:last-child {
+            border-bottom: none;
+        }
+
+        .flight-sidebar-info {
+            min-width: 0;
+            flex: 1;
+        }
+
+        .flight-sidebar-dest {
+            font-size: 12px;
+            font-weight: 500;
+            color: var(--anthracite);
+        }
+
+        .flight-sidebar-detail {
+            font-size: 10px;
+            color: var(--gray);
+        }
+
+        .flight-sidebar-price {
+            font-size: 14px;
+            font-weight: 600;
+            color: var(--sage);
+            text-align: right;
+        }
+
+        .flight-sidebar-ar {
+            font-size: 9px;
+            font-weight: 400;
+            color: var(--gray);
+            display: block;
+        }
+
         /* ========================================
            FLORIVAL FILMS LIST
            ======================================== */
@@ -1997,26 +2047,6 @@
             <span class="badge-duration">{{ next_vacation.days }} jours de liberté</span>
         </div>
         {% endif %}
-
-        <!-- Bons plans vols -->
-        <div class="flights-list">
-            <div class="section-title-sm">✈️ Vols depuis Basel-Mulhouse</div>
-            {% if cheap_flights %}
-            {% for flight in cheap_flights %}
-            <div class="flight-row">
-                <div class="flight-info">
-                    <span class="flight-dest">BSL → {{ flight.destination }}</span>
-                    <span class="flight-detail">{{ flight.airline }} · {{ flight.outbound_date|format_month }}</span>
-                </div>
-                <div class="flight-price">
-                    {{ flight.price_flight|int }}€<span class="flight-ar">A/R</span>
-                </div>
-            </div>
-            {% endfor %}
-            {% else %}
-            <div class="empty-state">Aucun vol &lt; 150€ détecté cette semaine</div>
-            {% endif %}
-        </div>
 
         {% if travel_citybreaks %}
         <!-- Grille destinations avion -->
@@ -2315,6 +2345,25 @@
                             <div class="vacation-dates">{{ v.start|format_date_short }} → {{ v.end|format_date_short }}</div>
                         </div>
                         <div class="vacation-days">{{ v.days }}j</div>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% endif %}
+
+                <!-- Bons plans vols BSL -->
+                {% if cheap_flights %}
+                <div class="flights-sidebar">
+                    <div class="section-title-sm">✈️ Vols — Basel-Mulhouse</div>
+                    {% for flight in cheap_flights[:5] %}
+                    <div class="flight-sidebar-row">
+                        <div class="flight-sidebar-info">
+                            <div class="flight-sidebar-dest">BSL → {{ flight.destination }}</div>
+                            <div class="flight-sidebar-detail">{{ flight.airline }} · {{ flight.month_label }}</div>
+                        </div>
+                        <div class="flight-sidebar-price">
+                            {{ flight.price_flight|int }}€
+                            <span class="flight-sidebar-ar">A/R</span>
+                        </div>
                     </div>
                     {% endfor %}
                 </div>
