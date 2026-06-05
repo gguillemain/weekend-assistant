@@ -378,7 +378,6 @@ def test_travel_route():
     # Paramètres personnalisables via query string
     days_ahead = int(request.args.get("days_ahead", 45))
     duration = int(request.args.get("duration", 7))
-    max_price = float(request.args.get("max_price", 300))
 
     # Créer une période de vacances fictive
     start = date.today() + timedelta(days=days_ahead)
@@ -392,13 +391,12 @@ def test_travel_route():
     }
 
     # Générer les suggestions
-    result = generate_travel_suggestions(test_period, max_budget=max_price)
+    result = generate_travel_suggestions(test_period)
 
     # Ajouter les paramètres utilisés
     result["test_params"] = {
         "days_ahead": days_ahead,
         "duration": duration,
-        "max_price": max_price,
         "period": test_period,
     }
 
