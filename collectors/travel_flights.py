@@ -441,20 +441,26 @@ def _get_fallback_flights(start_date: date, duration_days: int = 7) -> List[Dict
 
     Basé sur les destinations réelles et prix moyens observés.
     """
-    # Destinations populaires depuis BSL avec prix moyens A/R
+    # Destinations populaires depuis BSL - mix équilibré de compagnies
     bsl_destinations = [
-        {"iata": "STN", "city": "Londres", "country": "Royaume-Uni", "airline": "Ryanair", "price_range": (60, 90)},
-        {"iata": "BCN", "city": "Barcelone", "country": "Espagne", "airline": "Ryanair", "price_range": (70, 110)},
-        {"iata": "LIS", "city": "Lisbonne", "country": "Portugal", "airline": "EasyJet", "price_range": (80, 130)},
-        {"iata": "EDI", "city": "Édimbourg", "country": "Écosse", "airline": "Ryanair", "price_range": (85, 120)},
-        {"iata": "BUD", "city": "Budapest", "country": "Hongrie", "airline": "Wizzair", "price_range": (50, 80)},
-        {"iata": "PRG", "city": "Prague", "country": "Tchéquie", "airline": "Ryanair", "price_range": (55, 85)},
-        {"iata": "FCO", "city": "Rome", "country": "Italie", "airline": "Ryanair", "price_range": (65, 100)},
-        {"iata": "DUB", "city": "Dublin", "country": "Irlande", "airline": "Ryanair", "price_range": (70, 110)},
-        {"iata": "AGP", "city": "Malaga", "country": "Espagne", "airline": "EasyJet", "price_range": (75, 115)},
-        {"iata": "OPO", "city": "Porto", "country": "Portugal", "airline": "Ryanair", "price_range": (65, 95)},
-        {"iata": "KRK", "city": "Cracovie", "country": "Pologne", "airline": "Ryanair", "price_range": (45, 70)},
-        {"iata": "RAK", "city": "Marrakech", "country": "Maroc", "airline": "Ryanair", "price_range": (80, 130)},
+        # Ryanair
+        {"iata": "STN", "city": "Londres", "country": "Royaume-Uni", "airline": "Ryanair", "price_range": (55, 85)},
+        {"iata": "DUB", "city": "Dublin", "country": "Irlande", "airline": "Ryanair", "price_range": (65, 95)},
+        {"iata": "RAK", "city": "Marrakech", "country": "Maroc", "airline": "Ryanair", "price_range": (75, 120)},
+        {"iata": "OPO", "city": "Porto", "country": "Portugal", "airline": "Ryanair", "price_range": (70, 100)},
+        # EasyJet
+        {"iata": "LIS", "city": "Lisbonne", "country": "Portugal", "airline": "EasyJet", "price_range": (65, 95)},
+        {"iata": "BCN", "city": "Barcelone", "country": "Espagne", "airline": "EasyJet", "price_range": (60, 90)},
+        {"iata": "AGP", "city": "Malaga", "country": "Espagne", "airline": "EasyJet", "price_range": (70, 110)},
+        {"iata": "EDI", "city": "Édimbourg", "country": "Écosse", "airline": "EasyJet", "price_range": (80, 115)},
+        # Wizzair
+        {"iata": "BUD", "city": "Budapest", "country": "Hongrie", "airline": "Wizzair", "price_range": (45, 75)},
+        {"iata": "KRK", "city": "Cracovie", "country": "Pologne", "airline": "Wizzair", "price_range": (40, 65)},
+        {"iata": "WAW", "city": "Varsovie", "country": "Pologne", "airline": "Wizzair", "price_range": (50, 80)},
+        {"iata": "SOF", "city": "Sofia", "country": "Bulgarie", "airline": "Wizzair", "price_range": (55, 85)},
+        # Vueling
+        {"iata": "FCO", "city": "Rome", "country": "Italie", "airline": "Vueling", "price_range": (65, 95)},
+        {"iata": "VLC", "city": "Valence", "country": "Espagne", "airline": "Vueling", "price_range": (70, 100)},
     ]
 
     import random
@@ -488,10 +494,32 @@ def _get_fallback_flights(start_date: date, duration_days: int = 7) -> List[Dict
                 "budget_score": _calculate_budget_score(total_estimate),
             })
 
-    # Trier par prix
+    # Trier par prix puis mélanger un peu pour varier les compagnies affichées
     flights.sort(key=lambda f: f["price_flight"])
 
-    return flights
+    # Prendre les meilleurs de chaque compagnie pour diversifier
+    by_airline = {}
+    for f in flights:
+        airline = f["airline"]
+        if airline not in by_airline:
+            by_airline[airline] = []
+        by_airline[airline].append(f)
+
+    # Construire une liste diversifiée (1 de chaque compagnie en rotation)
+    diversified = []
+    airlines = list(by_airline.keys())
+    random.shuffle(airlines)
+    idx = 0
+    while len(diversified) < len(flights):
+        airline = airlines[idx % len(airlines)]
+        if by_airline[airline]:
+            diversified.append(by_airline[airline].pop(0))
+        idx += 1
+        # Éviter boucle infinie
+        if all(len(v) == 0 for v in by_airline.values()):
+            break
+
+    return diversified
 
 
 def format_flights_context(flights: List[Dict], limit: int = 5) -> str:
