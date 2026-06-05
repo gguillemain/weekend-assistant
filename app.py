@@ -148,49 +148,10 @@ def index():
     active_projects = profile.get_active_projects()
 
     # Données voyage (sans appel API lourd sur la page d'accueil)
-    # Les données complètes sont générées via /test-travel ou en mode vacances
+    # Les vols sont chargés dynamiquement via /flights (JavaScript)
     travel_citybreaks = []
     travel_roadtrips = []
-
-    # Vols statiques BSL - destinations populaires avec prix indicatifs
-    # Ces données sont mises à jour via /flights/refresh si nécessaire
-    cheap_flights = [
-        {
-            "destination": "Édimbourg",
-            "airline": "Ryanair",
-            "price_flight": 94,
-            "outbound_date": "2026-08-15",
-            "month_label": "août 2026"
-        },
-        {
-            "destination": "Lisbonne",
-            "airline": "EasyJet",
-            "price_flight": 78,
-            "outbound_date": "2026-09-10",
-            "month_label": "sept 2026"
-        },
-        {
-            "destination": "Budapest",
-            "airline": "Wizzair",
-            "price_flight": 67,
-            "outbound_date": "2026-08-22",
-            "month_label": "août 2026"
-        },
-        {
-            "destination": "Barcelone",
-            "airline": "Vueling",
-            "price_flight": 89,
-            "outbound_date": "2026-07-18",
-            "month_label": "juil 2026"
-        },
-        {
-            "destination": "Londres",
-            "airline": "EasyJet",
-            "price_flight": 72,
-            "outbound_date": "2026-08-05",
-            "month_label": "août 2026"
-        },
-    ]
+    cheap_flights = []  # Chargé via API /flights
 
     # On récupère uniquement les données statiques pour l'affichage
     # sans déclencher les appels API Ryanair/EasyJet/Claude
@@ -773,6 +734,56 @@ def memories_route():
     """Retourne les activités d'il y a un an."""
     memories = profile.get_memories()
     return jsonify({"memories": memories})
+
+
+@app.route("/flights")
+def flights_route():
+    """Retourne les vols pas chers depuis Basel-Mulhouse."""
+    from datetime import timedelta
+    from collectors.travel_flights import get_cheap_flights
+
+    today = date.today()
+    mois_fr = ['jan', 'fév', 'mars', 'avr', 'mai', 'juin',
+               'juil', 'août', 'sept', 'oct', 'nov', 'déc']
+
+    # Rechercher des vols sur les 3 prochains mois
+    vacation_period = {
+        "start": today + timedelta(days=14),
+        "end": today + timedelta(days=90),
+        "days": 7,
+        "label": "Prochains mois"
+    }
+
+    try:
+        flights = get_cheap_flights(vacation_period)
+
+        # Formater pour l'affichage
+        formatted_flights = []
+        for f in flights[:8]:  # Top 8 destinations
+            # Parser la date pour le mois
+            outbound_date = f.get("outbound_date", "")
+            month_label = ""
+            if outbound_date:
+                parts = outbound_date.split("-")
+                if len(parts) >= 2:
+                    month_idx = int(parts[1]) - 1
+                    year = parts[0]
+                    month_label = f"{mois_fr[month_idx]} {year}"
+
+            formatted_flights.append({
+                "destination": f.get("destination", ""),
+                "airline": f.get("airline", ""),
+                "price_flight": f.get("price_flight", 0),
+                "outbound_date": outbound_date,
+                "month_label": month_label,
+                "url": f.get("url", "")
+            })
+
+        return jsonify({"flights": formatted_flights})
+
+    except Exception as e:
+        print(f"[flights] Erreur : {e}")
+        return jsonify({"flights": [], "error": str(e)})
 
 
 def display_weather_forecast(forecast: dict) -> None:

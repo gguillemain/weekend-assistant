@@ -1760,6 +1760,28 @@
             display: block;
         }
 
+        .flights-loading {
+            font-size: 11px;
+            color: var(--gray);
+            text-align: center;
+            padding: 12px 0;
+        }
+
+        .flights-error {
+            font-size: 11px;
+            color: var(--red);
+            text-align: center;
+            padding: 8px 0;
+        }
+
+        .flights-empty {
+            font-size: 11px;
+            color: var(--gray);
+            font-style: italic;
+            text-align: center;
+            padding: 8px 0;
+        }
+
         /* ========================================
            FLORIVAL FILMS LIST
            ======================================== */
@@ -2350,24 +2372,13 @@
                 </div>
                 {% endif %}
 
-                <!-- Bons plans vols BSL -->
-                {% if cheap_flights %}
-                <div class="flights-sidebar">
+                <!-- Bons plans vols BSL (chargé dynamiquement) -->
+                <div class="flights-sidebar" id="flights-sidebar">
                     <div class="section-title-sm">✈️ Vols — Basel-Mulhouse</div>
-                    {% for flight in cheap_flights[:5] %}
-                    <div class="flight-sidebar-row">
-                        <div class="flight-sidebar-info">
-                            <div class="flight-sidebar-dest">BSL → {{ flight.destination }}</div>
-                            <div class="flight-sidebar-detail">{{ flight.airline }} · {{ flight.month_label }}</div>
-                        </div>
-                        <div class="flight-sidebar-price">
-                            {{ flight.price_flight|int }}€
-                            <span class="flight-sidebar-ar">A/R</span>
-                        </div>
+                    <div id="flights-content">
+                        <div class="flights-loading">Chargement...</div>
                     </div>
-                    {% endfor %}
                 </div>
-                {% endif %}
 
                 <!-- Projets en cours (résumé) -->
                 {% if active_projects %}
@@ -3384,6 +3395,45 @@
                     console.error('Erreur chargement mémoires:', err);
                 });
         }
+
+        // === Vols BSL ===
+        function loadFlights() {
+            var container = document.getElementById('flights-content');
+
+            fetch('./flights')
+                .then(function(response) { return response.json(); })
+                .then(function(data) {
+                    var flights = data.flights || [];
+
+                    if (flights.length === 0) {
+                        container.innerHTML = '<div class="flights-empty">Aucun vol disponible</div>';
+                        return;
+                    }
+
+                    var html = '';
+                    flights.slice(0, 5).forEach(function(flight) {
+                        html += '<div class="flight-sidebar-row">';
+                        html += '  <div class="flight-sidebar-info">';
+                        html += '    <div class="flight-sidebar-dest">BSL → ' + escapeHtml(flight.destination) + '</div>';
+                        html += '    <div class="flight-sidebar-detail">' + escapeHtml(flight.airline) + ' · ' + escapeHtml(flight.month_label) + '</div>';
+                        html += '  </div>';
+                        html += '  <div class="flight-sidebar-price">';
+                        html += '    ' + Math.round(flight.price_flight) + '€';
+                        html += '    <span class="flight-sidebar-ar">A/R</span>';
+                        html += '  </div>';
+                        html += '</div>';
+                    });
+
+                    container.innerHTML = html;
+                })
+                .catch(function(err) {
+                    console.error('Erreur chargement vols:', err);
+                    container.innerHTML = '<div class="flights-error">Erreur de chargement</div>';
+                });
+        }
+
+        // Charger les vols au démarrage
+        loadFlights();
     </script>
 </body>
 </html>
