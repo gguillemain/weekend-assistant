@@ -2,157 +2,180 @@
 
 ## Vue d'ensemble
 
-Application Flask de suggestions d'activités pour le week-end (région Alsace/Bâle). Collecte des données de plusieurs sources (cinéma, concerts, expos, randonnées, vélo, restaurants, météo) et propose des recommandations personnalisées.
+Application Flask de suggestions d'activités pour le week-end (région Alsace/Bâle). Collecte des données de plusieurs sources et propose des recommandations personnalisées avec un système de combinaisons d'activités.
 
 ## Architecture
 
 ```
 weekend_assistant/
-├── app.py                 # Serveur Flask principal (port 5001 local, 5000 Docker)
+├── app.py                 # Serveur Flask (port 5001 local, 5000 Docker)
 ├── config.py              # Configuration (clés API, paramètres)
 ├── collectors/            # Modules de collecte de données
 │   ├── cinema.py          # Films (Télérama RSS, Cahiers du Cinéma)
 │   ├── concerts.py        # Concerts (Ticketmaster API)
-│   ├── exhibitions.py     # Expositions (scraping musées)
+│   ├── exhibitions.py     # Expositions (scraping musées) + urgency_score
 │   ├── events.py          # Événements locaux (JDS, Strasbourg.eu)
 │   ├── hiking.py          # Randonnées (Visorando scraping)
-│   ├── cycling.py         # Vélo (alsaceavelo.fr scraping)
-│   ├── restaurants.py     # Restaurants (liste Michelin/Gault&Millau)
+│   ├── cycling.py         # Vélo VAE (alsaceavelo.fr scraping)
+│   ├── restaurants.py     # Restaurants (Foursquare API)
 │   ├── discovery.py       # Découvertes diverses
-│   └── weather.py         # Météo (API OpenWeatherMap)
+│   ├── weather.py         # Météo (API OpenWeatherMap)
+│   └── travel_flights.py  # Vols BSL (Ryanair/EasyJet + fallback)
 ├── engine/
-│   ├── database.py        # Connexion SQLite, schéma
-│   ├── profile.py         # Gestion profil utilisateur, historique
-│   ├── cache.py           # Système de cache pour éviter re-scraping
-│   └── suggestions.py     # Logique de recommandation
+│   ├── database.py        # SQLite, schéma, migrations
+│   ├── profile.py         # Profil, historique, projets, recommandations
+│   ├── suggest.py         # Logique suggestions + build_combos()
+│   ├── cache.py           # Cache pour éviter re-scraping
+│   ├── calendar_engine.py # Calcul périodes (week-ends, vacances, ponts)
+│   └── travel_engine.py   # Suggestions voyages
 ├── templates/
-│   └── index.html         # Frontend (HTML/CSS/JS vanilla)
+│   └── index.html         # Frontend (layout 2 colonnes, vanilla JS)
 ├── data/
-│   └── preferences.db     # Base SQLite (profil, historique, feedback)
+│   └── preferences.db     # Base SQLite
 ├── Dockerfile
 └── docker-compose.weekend.yml
 ```
 
-## Endpoints API principaux
+## Layout Frontend (2 colonnes)
+
+```
+┌─────────────────────────────────────────────────────┐
+│  HEADER : Weekend Assistant · Période · Météo      │
+└─────────────────────────────────────────────────────┘
+┌───────────────────────────────┬─────────────────────┐
+│  COL-MAIN (flex: 1)           │  COL-SIDEBAR (240px)│
+│                               │                     │
+│  - Suggestions Claude         │  - Mini calendrier  │
+│  - Films Florival (compact)   │  - Prochaines vacs  │
+│  - Journal d'activité         │  - Vols BSL         │
+│  - Recommandations entourage  │  - Projets (top 4)  │
+│  - Projets de vie             │                     │
+│  - Mémoires "il y a un an"    │                     │
+└───────────────────────────────┴─────────────────────┘
+```
+
+## Endpoints API
 
 | Endpoint | Méthode | Description |
 |----------|---------|-------------|
-| `/` | GET | Page principale avec suggestions |
-| `/suggestions` | GET | API JSON des suggestions |
-| `/profile` | GET | Profil et historique (`?mode=full` pour historique complet) |
-| `/activity` | POST | Enregistrer une activité du week-end |
-| `/mark-as-done` | POST | Marquer une suggestion comme faite |
-| `/feedback` | POST | Envoyer un feedback (pouce haut/bas) |
-| `/cache-stats` | GET | Statistiques du cache |
-| `/cache-clear` | POST | Vider le cache |
+| `/` | GET | Page principale |
+| `/suggestions` | GET | API JSON suggestions |
+| `/profile` | GET | Profil (`?mode=full` pour historique) |
+| `/activity` | POST | Enregistrer activité |
+| `/feedback` | POST | Feedback (pouce haut/bas) |
+| `/flights` | GET | Vols BSL dynamiques (Ryanair/EasyJet) |
+| `/projects` | GET/POST | Liste/Ajout projets de vie |
+| `/projects/<id>` | DELETE | Supprimer projet |
+| `/projects/<id>/done` | POST | Marquer projet accompli |
+| `/projects/suggestions` | GET | Suggestions projets via Claude |
+| `/recommendations` | GET/POST | Liste/Ajout recommandations |
+| `/recommendations/<id>/done` | POST | Marquer recommandation faite |
+| `/memories` | GET | Activités "il y a un an" |
+| `/cache-stats` | GET | Stats cache |
+| `/cache-clear` | POST | Vider cache |
 
-## Déploiement VPS
+## Fonctionnalités clés
 
-### Configuration
+### 1. Combinaisons d'activités (build_combos)
 
-- **Chemin VPS** : `~/weekend-assistant/`
-- **Utilisateur** : `mathebuchapp`
-- **Container** : `weekend-assistant`
-- **Port interne** : 5000
-- **Port exposé** : 127.0.0.1:5001
-- **Reverse proxy** : Nginx sur `/weekend`
+`engine/suggest.py` construit automatiquement des journées complètes :
 
-### Configuration Nginx
+| Type | Exemple |
+|------|---------|
+| `rando_midi` | 🥾🍽️ Sentier des Roches + Auberge du Lac |
+| `velo_winstub` | 🚴🍺 Vignoble Rouffach + Winstub |
+| `cinema_ville` | 🎬🚶 Film au Florival + balade Guebwiller |
+| `expo_gastro` | 🖼️🍽️ Beyeler + Restaurant bâlois |
+| `escapade_bale` | 🏛️🇨🇭 Journée Bâle complète |
 
-L'application est servie sous le préfixe `/weekend` :
-```nginx
-location /weekend {
-    rewrite ^/weekend(/.*)$ $1 break;
-    rewrite ^/weekend$ / break;
-    proxy_pass http://127.0.0.1:5001;
-    # ... headers et timeouts
-}
-```
+Badge "Journée complète" affiché sur ces suggestions.
 
-**Important** : Les appels fetch frontend utilisent des chemins relatifs (`./profile`, `./suggestions`) pour fonctionner avec ce préfixe.
+### 2. Projets de vie
 
-### Commandes de déploiement
+Table `life_projects` avec :
+- Titre, catégorie (voyage/culture/sport/gastronomie)
+- Priorité : 🔥 haute (3), 💛 envie (2), ⭐ rêve (1)
+- Mots-clés pour matching automatique avec suggestions
 
-```bash
-# Se connecter au VPS
-ssh mathebuchapp@<IP_VPS>
+### 3. Recommandations entourage
 
-# Aller dans le projet
-cd ~/weekend-assistant
+Table `recommendations` : suggestions de proches (resto, destination, expo...).
+Intégrées dans le prompt Claude si pertinentes.
 
-# Mettre à jour le code
-git pull origin main
+### 4. Urgency Score
 
-# Reconstruire et relancer le conteneur
-docker-compose -f docker-compose.weekend.yml build --no-cache
-docker-compose -f docker-compose.weekend.yml up -d
+Pour expos/concerts avec date de fin proche :
+- < 7 jours : score 1.0, "Dernier week-end !"
+- < 14 jours : score 0.9, "Plus que X jours"
+- Badge `⚠️` sur les cards
 
-# Voir les logs
-docker logs weekend-assistant --tail 100 -f
+### 5. Vols BSL dynamiques
 
-# Vérifier l'état
-docker ps | grep weekend
-```
+Route `/flights` :
+1. Tente APIs Ryanair/EasyJet
+2. Fallback données réalistes si APIs indisponibles
+3. Mix compagnies : Ryanair, EasyJet, Wizzair, Vueling
+4. Cache 24h
 
-### Commandes de debug
+### 6. Mini calendrier sidebar
 
-```bash
-# Tester un endpoint depuis le VPS
-curl http://127.0.0.1:5001/profile?mode=full | jq
-
-# Voir la base de données
-docker exec weekend-assistant ls -la /app/data/
-
-# Redémarrer sans rebuild
-docker-compose -f docker-compose.weekend.yml restart
-
-# Logs nginx
-sudo tail -f /var/log/nginx/error.log
-```
+Affiche le mois en cours avec :
+- Jour actuel entouré
+- Week-ends en vert clair
+- Vacances en vert foncé
 
 ## Base de données
 
-SQLite stockée dans `data/preferences.db` (volume Docker monté).
+SQLite dans `data/preferences.db` :
 
-### Tables principales
+| Table | Description |
+|-------|-------------|
+| `user_profile` | Clés/valeurs préférences |
+| `activity_log` | Historique (films, concerts, expos, randos, vélo, restos) |
+| `suggestion_feedback` | Feedback utilisateur |
+| `recommendations` | Recommandations de l'entourage |
+| `life_projects` | Projets de vie |
 
-- **activity_log** : Historique des activités (films, concerts, expos, randos, vélo, restaurants)
-- **suggestion_feedback** : Feedback utilisateur sur les suggestions
-- **user_profile** : Préférences utilisateur
+## Déploiement VPS
 
-### Déduplication
+```bash
+ssh mathebuchapp@<IP_VPS>
+cd ~/weekend-assistant
+git pull origin main
+docker-compose -f docker-compose.weekend.yml build --no-cache
+docker-compose -f docker-compose.weekend.yml up -d
+docker logs weekend-assistant --tail 100 -f
+```
 
-Les collectors utilisent `get_seen_items_normalized()` pour éviter de re-suggérer des éléments déjà vus :
-- Concerts/Expos : 365 jours
-- Randonnées/Vélo/Restaurants : 90 jours
-- Discovery : 180 jours
+### Configuration Nginx
 
-## Points d'attention
+Préfixe `/weekend` :
+```nginx
+location /weekend {
+    rewrite ^/weekend(/.*)$ $1 break;
+    proxy_pass http://127.0.0.1:5001;
+}
+```
 
-1. **Après chaque modification** : Reconstruire l'image Docker sur le VPS
-2. **Chemins relatifs** : Utiliser `./` pour les fetch API (commit c040086)
-3. **Rate limiting** : Ticketmaster peut renvoyer 429 (Too Many Requests)
-4. **Cache** : Les données sont cachées pour éviter le scraping excessif
-5. **Healthcheck** : Le conteneur peut apparaître "unhealthy" si `/cache-stats` timeout
-
-## Clés API requises (.env)
+## Clés API (.env)
 
 ```
 OPENWEATHERMAP_API_KEY=...
 TICKETMASTER_API_KEY=...
+FOURSQUARE_API_KEY=...
+ANTHROPIC_API_KEY=...
 ```
 
-Note : Les restaurants utilisent une liste statique (pas d'API).
+## Points d'attention
+
+1. **Chemins relatifs** : Utiliser `./` pour les fetch API
+2. **Cache** : Les données sont cachées (météo 3h, vols 24h)
+3. **Timeouts** : Vols chargés en async pour éviter 504
+4. **Mobile** : Sidebar passe au-dessus sur < 700px
 
 ## Développement local
 
 ```bash
-# Installer les dépendances
 pip install -r requirements.txt
-
-# Lancer en local
 python app.py  # Port 5001
-
-# Ou avec Docker
-docker-compose -f docker-compose.weekend.yml up --build
 ```
