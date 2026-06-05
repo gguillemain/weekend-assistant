@@ -64,6 +64,23 @@ def init_db():
         )
     """)
 
+    # Table recommendations : recommandations de l'entourage
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS recommendations (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            source TEXT NOT NULL,
+            type TEXT NOT NULL,
+            title TEXT NOT NULL,
+            city TEXT,
+            country TEXT,
+            notes TEXT,
+            url TEXT,
+            added_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            done BOOLEAN DEFAULT 0,
+            done_at DATETIME
+        )
+    """)
+
     conn.commit()
 
     # Peupler le profil initial

@@ -430,6 +430,52 @@ def cache_clear_route():
         return jsonify({"cleared": count, "mode": "all"})
 
 
+@app.route("/recommendations")
+def recommendations_list_route():
+    """Retourne la liste des recommandations."""
+    pending = profile.get_pending_recommendations()
+    done = profile.get_done_recommendations()
+    return jsonify({
+        "pending": pending,
+        "done": done
+    })
+
+
+@app.route("/recommendations", methods=["POST"])
+def recommendations_add_route():
+    """Ajoute une nouvelle recommandation."""
+    data = request.get_json()
+
+    if not data:
+        return jsonify({"error": "JSON requis"}), 400
+
+    source = data.get("source")
+    rec_type = data.get("type")
+    title = data.get("title")
+
+    if not source or not rec_type or not title:
+        return jsonify({"error": "source, type et title requis"}), 400
+
+    rec_id = profile.add_recommendation(
+        source=source,
+        type=rec_type,
+        title=title,
+        city=data.get("city", ""),
+        country=data.get("country", ""),
+        notes=data.get("notes", ""),
+        url=data.get("url", "")
+    )
+
+    return jsonify({"ok": True, "id": rec_id})
+
+
+@app.route("/recommendations/<int:rec_id>/done", methods=["POST"])
+def recommendations_done_route(rec_id):
+    """Marque une recommandation comme faite."""
+    profile.mark_recommendation_done(rec_id)
+    return jsonify({"ok": True})
+
+
 def display_weather_forecast(forecast: dict) -> None:
     """Affiche les prévisions météo de manière formatée."""
     print(f"\n{'='*50}")

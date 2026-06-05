@@ -482,3 +482,144 @@ def get_full_activity_history(limit: int = 50) -> Dict:
         'total': len(activities),
         'grouped': [v for k, v in sorted(grouped.items(), reverse=True)]
     }
+
+
+# ============================================================
+# Recommandations de l'entourage
+# ============================================================
+
+def add_recommendation(
+    source: str,
+    type: str,
+    title: str,
+    city: str = "",
+    country: str = "",
+    notes: str = "",
+    url: str = ""
+) -> int:
+    """
+    Ajoute une recommandation de l'entourage.
+
+    Args:
+        source: Personne qui recommande (ex: "Pierre")
+        type: Type de recommandation (restaurant, destination, activite, expo, film, concert)
+        title: Titre/nom de la recommandation
+        city: Ville (optionnel)
+        country: Pays (optionnel)
+        notes: Notes/commentaires (optionnel)
+        url: Lien URL (optionnel)
+
+    Returns:
+        ID de la recommandation créée
+    """
+    conn = get_connection()
+    cursor = conn.cursor()
+
+    cursor.execute("""
+        INSERT INTO recommendations (source, type, title, city, country, notes, url)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+    """, (source, type, title, city, country, notes, url))
+
+    rec_id = cursor.lastrowid
+    conn.commit()
+    conn.close()
+
+    return rec_id
+
+
+def get_pending_recommendations() -> List[Dict]:
+    """
+    Retourne les recommandations non encore faites.
+
+    Returns:
+        Liste de recommandations (done=False), triées par added_at DESC
+    """
+    conn = get_connection()
+    cursor = conn.cursor()
+
+    cursor.execute("""
+        SELECT id, source, type, title, city, country, notes, url, added_at
+        FROM recommendations
+        WHERE done = 0
+        ORDER BY added_at DESC
+    """)
+
+    results = [dict(row) for row in cursor.fetchall()]
+    conn.close()
+    return results
+
+
+def get_done_recommendations() -> List[Dict]:
+    """
+    Retourne les recommandations déjà faites.
+
+    Returns:
+        Liste de recommandations (done=True), triées par done_at DESC
+    """
+    conn = get_connection()
+    cursor = conn.cursor()
+
+    cursor.execute("""
+        SELECT id, source, type, title, city, country, notes, url, added_at, done_at
+        FROM recommendations
+        WHERE done = 1
+        ORDER BY done_at DESC
+    """)
+
+    results = [dict(row) for row in cursor.fetchall()]
+    conn.close()
+    return results
+
+
+def mark_recommendation_done(rec_id: int) -> None:
+    """
+    Marque une recommandation comme faite.
+
+    Args:
+        rec_id: ID de la recommandation
+    """
+    conn = get_connection()
+    cursor = conn.cursor()
+
+    cursor.execute("""
+        UPDATE recommendations
+        SET done = 1, done_at = ?
+        WHERE id = ?
+    """, (datetime.now().isoformat(), rec_id))
+
+    conn.commit()
+    conn.close()
+
+
+def get_recommendations_for_prompt() -> str:
+    """
+    Retourne une string formatée des recommandations pour le prompt Claude.
+
+    Returns:
+        Texte formaté avec max 5 recommandations pending
+    """
+    pending = get_pending_recommendations()
+
+    if not pending:
+        return ""
+
+    lines = ["Recommandations de l'entourage :"]
+
+    for rec in pending[:5]:
+        location = rec.get("city", "")
+        if rec.get("country"):
+            location = f"{location}, {rec['country']}" if location else rec["country"]
+
+        line = f"- {rec['title']}"
+        if location:
+            line += f" ({rec['type']}, {location})"
+        else:
+            line += f" ({rec['type']})"
+        line += f" — par {rec['source']}"
+
+        if rec.get("notes"):
+            line += f"\n  Notes : {rec['notes']}"
+
+        lines.append(line)
+
+    return "\n".join(lines)

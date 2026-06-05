@@ -48,6 +48,13 @@ ou Bâle. Adapte le restaurant au contexte global de la suggestion :
 rando dans les Vosges → auberge de montagne, expo à Colmar → winstub
 en centre-ville, escapade à Bâle → table bâloise.
 
+Si des recommandations de l'entourage sont présentes et correspondent
+à la période (week-end local ou vacances), propose-les naturellement
+en mentionnant la personne qui les a conseillées. Pour les destinations
+de vacances, ne les propose que si la période est suffisamment longue.
+Ne force pas une recommandation si elle ne correspond pas du tout
+au contexte.
+
 Tu proposes des idées concrètes, bien argumentées,
 adaptées à la météo et aux événements réels fournis.
 Tu n'inventes rien : tu t'appuies uniquement sur les
@@ -81,6 +88,11 @@ Tu proposes des idées de voyages concrètes et réalisables,
 basées UNIQUEMENT sur les destinations fournies.
 Tu n'inventes pas de destinations. Ton ton est enthousiaste
 mais réaliste, avec des conseils pratiques.
+
+Si des recommandations de l'entourage sont présentes et correspondent
+à la période de vacances, propose-les naturellement en mentionnant
+la personne qui les a conseillées. Ne force pas une recommandation
+si elle ne correspond pas du tout au contexte ou à la durée disponible.
 
 {profile_section}
 
@@ -270,6 +282,7 @@ Dates : du {period['start'].strftime('%d/%m/%Y')} au {period['end'].strftime('%d
 Durée : {period['days']} jours"""
 
     travel_context = travel.format_travel_context(travel_data)
+    recommendations_context = profile.get_recommendations_for_prompt()
 
     request = """Propose 3 à 4 idées de voyage pour ces vacances.
 
@@ -300,6 +313,8 @@ Mélange city breaks proches et destinations plus lointaines si la durée le per
 
 {travel_context}
 
+{recommendations_context}
+
 {request}"""
 
 
@@ -319,6 +334,7 @@ Mode : {period['mode']}"""
     exhibitions_context = exhibitions.format_exhibitions_context(exhibitions_list) if exhibitions_list else ""
     discovery_context = discovery.format_discovery_context(discovery_list) if discovery_list else ""
     restaurants_context = restaurants.format_restaurants_context(restaurants_list) if restaurants_list else ""
+    recommendations_context = profile.get_recommendations_for_prompt()
 
     request = """Propose 3 à 5 suggestions pour cette période.
 
@@ -363,6 +379,8 @@ Privilégie la variété : mélange cinéma, randonnée, vélo, exposition, conc
 {discovery_context}
 
 {restaurants_context}
+
+{recommendations_context}
 
 {request}"""
 
