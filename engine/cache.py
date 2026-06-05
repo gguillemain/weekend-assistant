@@ -225,4 +225,5 @@ CACHE_TTL = {
     "openagenda": 360,   # 6h
     "restaurants": 480,  # 8h
     "flights": 1440,     # 24h (prix changent souvent)
+    "travel_deals": 240, # 4h (deals peuvent expirer)
 }

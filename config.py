@@ -27,6 +27,53 @@ BASE_LOCATION = {
 WEEKEND_RADIUS_KM = 300
 VACATION_SEND_DAYS_BEFORE = 21
 
+# =============================================================================
+# CONFIGURATION TRAVEL
+# =============================================================================
+
+# Aéroports de départ (Basel-Mulhouse)
+HOME_AIRPORTS = ["BSL", "MLH"]
+
+# Seuils de déclenchement par type de voyage (jours avant vacances)
+TRAVEL_ALERT_DAYS = {
+    "flight_trip": 90,      # City-breaks en avion : alerter 3 mois avant
+    "roadtrip": 30,         # Roadtrips voiture : alerter 1 mois avant
+    "weekend_escape": 14,   # Escapades courtes : alerter 2 semaines avant
+}
+
+# Phases de recommandation voyage
+TRAVEL_PHASES = {
+    "INSPIRATION": {"min_days": 90, "description": "Découvrir des destinations"},
+    "OPPORTUNITIES": {"min_days": 60, "description": "Détecter les bonnes affaires"},
+    "BOOKING": {"min_days": 30, "description": "Recommander la réservation"},
+    "LAST_CALL": {"min_days": 0, "description": "Dernière suggestion"},
+}
+
+# Estimation prix hôtel par nuit (2 personnes, budget)
+HOTEL_ESTIMATES = {
+    "London": 120,
+    "Dublin": 90,
+    "Edinburgh": 85,
+    "Budapest": 55,
+    "Prague": 60,
+    "Vienna": 80,
+    "Amsterdam": 95,
+    "Barcelona": 85,
+    "Rome": 80,
+    "Lisbon": 70,
+    "Copenhagen": 100,
+    "Madrid": 75,
+    "Brussels": 80,
+    "Porto": 65,
+    "Seville": 70,
+    "Warsaw": 50,
+    "Krakow": 45,
+    "Valencia": 70,
+    "Milan": 85,
+    "Berlin": 75,
+    "default": 75,
+}
+
 HIKING_PREFS = {
     "max_elevation_gain": 300,
     "prefer_loop": True,

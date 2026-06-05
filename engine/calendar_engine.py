@@ -283,9 +283,13 @@ def get_next_period() -> Dict:
     return periods[0] if periods else None
 
 
-def get_upcoming_vacation(from_date: date = None) -> Dict:
+def get_upcoming_vacation(from_date: date = None, threshold_days: int = None) -> Dict:
     """
-    Retourne les prochaines vacances si elles arrivent bientôt.
+    Retourne les prochaines vacances si elles arrivent dans le seuil.
+
+    Args:
+        from_date: Date de référence (défaut: aujourd'hui)
+        threshold_days: Seuil en jours (défaut: TRAVEL_ALERT_DAYS["flight_trip"] = 90)
 
     Returns:
         Dict avec start, end, days, label ou None si pas de vacances proches
@@ -293,7 +297,11 @@ def get_upcoming_vacation(from_date: date = None) -> Dict:
     if from_date is None:
         from_date = date.today()
 
-    threshold = from_date + timedelta(days=config.VACATION_SEND_DAYS_BEFORE)
+    if threshold_days is None:
+        # Utiliser le seuil le plus large (90 jours pour les vols)
+        threshold_days = config.TRAVEL_ALERT_DAYS.get("flight_trip", 90)
+
+    threshold = from_date + timedelta(days=threshold_days)
     vacations = _get_vacations(from_date)
 
     for vacation in vacations:
@@ -308,8 +316,43 @@ def get_days_until_vacation(from_date: date = None) -> int:
     if from_date is None:
         from_date = date.today()
 
-    vacation = get_upcoming_vacation(from_date)
-    if vacation:
-        return (vacation["start"] - from_date).days
+    vacations = _get_vacations(from_date)
+    if vacations:
+        return (vacations[0]["start"] - from_date).days
 
     return -1
+
+
+def get_vacation_for_travel_alert(from_date: date = None) -> Dict:
+    """
+    Retourne les vacances si un email voyage doit être envoyé aujourd'hui.
+
+    Vérifie si on est à J-90, J-60, J-30, ou J-14 d'une période de vacances.
+
+    Returns:
+        Dict avec vacation et phase, ou None
+    """
+    if from_date is None:
+        from_date = date.today()
+
+    vacations = _get_vacations(from_date)
+
+    alert_days = [90, 60, 30, 14]
+
+    for vacation in vacations:
+        days_until = (vacation["start"] - from_date).days
+
+        if days_until in alert_days:
+            from engine.travel_engine import get_travel_phase
+            return {
+                "vacation": vacation,
+                "days_until": days_until,
+                "phase": get_travel_phase(days_until),
+            }
+
+    return None
+
+
+def should_send_travel_email(from_date: date = None) -> bool:
+    """Vérifie si un email voyage doit être envoyé aujourd'hui."""
+    return get_vacation_for_travel_alert(from_date) is not None
