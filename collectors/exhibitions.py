@@ -32,6 +32,40 @@ STYLE_KEYWORDS = {
 }
 
 
+def compute_urgency(date_end) -> dict:
+    """
+    Calcule le score d'urgence pour une exposition.
+
+    Args:
+        date_end: Date de fin de l'exposition
+
+    Returns:
+        Dict avec score, label, alert
+    """
+    if not date_end:
+        return {"score": 0.2, "label": "", "alert": False}
+
+    # Convertir si c'est une string
+    if isinstance(date_end, str):
+        try:
+            date_end = datetime.strptime(date_end, "%Y-%m-%d").date()
+        except ValueError:
+            return {"score": 0.2, "label": "", "alert": False}
+
+    days = (date_end - date.today()).days
+
+    if days < 0:
+        return {"score": 0, "label": "terminée", "alert": False}
+    elif days <= 7:
+        return {"score": 1.0, "label": "Dernier week-end !", "alert": True}
+    elif days <= 14:
+        return {"score": 0.9, "label": f"Plus que {days} jours", "alert": True}
+    elif days <= 30:
+        return {"score": 0.6, "label": f"Jusqu'au {date_end.strftime('%d/%m')}", "alert": False}
+    else:
+        return {"score": 0.2, "label": "", "alert": False}
+
+
 def _get_distance(city: str) -> float:
     """Retourne la distance depuis Guebwiller pour une ville."""
     city_lower = city.lower().strip()
@@ -777,7 +811,7 @@ def get_exhibitions(period: Dict, profile: Dict, verbose: bool = False) -> List[
 
     filtered = deduplicated
 
-    # Calculer profile_match
+    # Calculer profile_match et urgency
     for expo in filtered:
         expo["profile_match"] = _calculate_profile_match(
             expo["title"],
@@ -786,6 +820,9 @@ def get_exhibitions(period: Dict, profile: Dict, verbose: bool = False) -> List[
             expo["venue"],
             profile
         )
+        # Calculer l'urgence
+        expo["urgency"] = compute_urgency(expo.get("date_end"))
+
         # Détecter le type si pas déjà fait
         if expo["type"] == "autre":
             expo["type"] = _detect_expo_type(
@@ -814,8 +851,13 @@ def format_exhibitions_context(exhibitions: List[Dict]) -> str:
     if not exhibitions:
         return "Expositions : aucune exposition trouvée pour cette période."
 
-    top_expos = exhibitions[:4]
-    lines = ["Expositions en cours :"]
+    # Trier par urgency score décroissant, puis profile_match
+    sorted_expos = sorted(
+        exhibitions,
+        key=lambda x: (-x.get("urgency", {}).get("score", 0), -x.get("profile_match", 0))
+    )
+    top_expos = sorted_expos[:4]
+    lines = ["Expositions (triées par urgence) :"]
 
     for expo in top_expos:
         # Gérer date_start qui peut être date, str (depuis cache JSON) ou None
@@ -851,6 +893,12 @@ def format_exhibitions_context(exhibitions: List[Dict]) -> str:
             date_end_str = "?"
 
         lines.append(f"- {expo['title']} — {expo['venue']} ({expo['city']}, {expo['distance_km']:.0f}km)")
+
+        # Ajouter l'alerte urgence si présente
+        urgency = expo.get("urgency", {})
+        if urgency.get("alert"):
+            lines.append(f"  ⚠️ {urgency['label']}")
+
         lines.append(f"  Du {date_start_str} au {date_end_str}")
         lines.append(f"  Match profil : {expo['profile_match']:.1f}")
 

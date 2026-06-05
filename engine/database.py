@@ -81,10 +81,29 @@ def init_db():
         )
     """)
 
+    # Table life_projects : projets de vie à accomplir
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS life_projects (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            title TEXT NOT NULL,
+            category TEXT,
+            keywords TEXT,
+            status TEXT DEFAULT 'actif',
+            priority INTEGER DEFAULT 2,
+            notes TEXT,
+            accomplished_at DATETIME,
+            added_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+
     conn.commit()
 
     # Peupler le profil initial
     _populate_initial_profile(cursor)
+
+    # Peupler les projets de vie initiaux
+    _populate_initial_projects(cursor)
+
     conn.commit()
     conn.close()
 
@@ -158,6 +177,75 @@ def _populate_initial_profile(cursor):
                 INSERT OR IGNORE INTO user_profile (key, value, updated_at)
                 VALUES (?, ?, ?)
             """, (key, json.dumps(value, ensure_ascii=False), datetime.now().isoformat()))
+
+
+def _populate_initial_projects(cursor):
+    """Insère les projets de vie initiaux."""
+    initial_projects = [
+        {
+            "title": "Voir une expo Klimt",
+            "category": "culture",
+            "keywords": ["klimt", "symbolisme", "vienne", "expo"],
+            "priority": 2
+        },
+        {
+            "title": "Faire l'EuroVelo 15 — Rhin",
+            "category": "sport",
+            "keywords": ["eurovelo", "rhin", "velo", "cyclable"],
+            "priority": 2
+        },
+        {
+            "title": "Week-end à Vienne",
+            "category": "voyage",
+            "keywords": ["vienne", "autriche", "wien"],
+            "priority": 2
+        },
+        {
+            "title": "Concert The Cure",
+            "category": "culture",
+            "keywords": ["the cure", "cure", "concert"],
+            "priority": 1
+        },
+        {
+            "title": "Voir les Cinque Terre",
+            "category": "voyage",
+            "keywords": ["cinque terre", "ligurie", "italie"],
+            "priority": 2
+        },
+        {
+            "title": "Expo surréaliste à Bâle ou Strasbourg",
+            "category": "culture",
+            "keywords": ["surrealisme", "dali", "magritte", "expo", "surrealiste"],
+            "priority": 2
+        },
+        {
+            "title": "Week-end à Londres pour Géraldine",
+            "category": "voyage",
+            "keywords": ["londres", "london", "uk", "angleterre"],
+            "priority": 3
+        },
+        {
+            "title": "Randonnée GR5 — étape Vosges",
+            "category": "sport",
+            "keywords": ["gr5", "vosges", "grande randonnee"],
+            "priority": 1
+        }
+    ]
+
+    for project in initial_projects:
+        cursor.execute("""
+            INSERT OR IGNORE INTO life_projects (title, category, keywords, priority)
+            SELECT ?, ?, ?, ?
+            WHERE NOT EXISTS (
+                SELECT 1 FROM life_projects WHERE title = ?
+            )
+        """, (
+            project["title"],
+            project["category"],
+            json.dumps(project["keywords"], ensure_ascii=False),
+            project["priority"],
+            project["title"]
+        ))
 
 
 # Initialiser la DB au premier import

@@ -568,6 +568,53 @@ def recommendations_done_route(rec_id):
     return jsonify({"ok": True})
 
 
+@app.route("/projects")
+def projects_list_route():
+    """Retourne la liste des projets actifs."""
+    projects = profile.get_active_projects()
+    return jsonify({"projects": projects})
+
+
+@app.route("/projects", methods=["POST"])
+def projects_add_route():
+    """Ajoute un nouveau projet."""
+    data = request.get_json()
+
+    if not data:
+        return jsonify({"error": "JSON requis"}), 400
+
+    title = data.get("title")
+    category = data.get("category")
+    keywords = data.get("keywords", [])
+
+    if not title:
+        return jsonify({"error": "title requis"}), 400
+
+    project_id = profile.add_project(
+        title=title,
+        category=category,
+        keywords=keywords,
+        priority=data.get("priority", 2),
+        notes=data.get("notes", "")
+    )
+
+    return jsonify({"ok": True, "id": project_id})
+
+
+@app.route("/projects/<int:project_id>/done", methods=["POST"])
+def projects_done_route(project_id):
+    """Marque un projet comme accompli."""
+    profile.mark_project_accomplished(project_id)
+    return jsonify({"ok": True})
+
+
+@app.route("/memories")
+def memories_route():
+    """Retourne les activités d'il y a un an."""
+    memories = profile.get_memories()
+    return jsonify({"memories": memories})
+
+
 def display_weather_forecast(forecast: dict) -> None:
     """Affiche les prévisions météo de manière formatée."""
     print(f"\n{'='*50}")

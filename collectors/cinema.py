@@ -440,12 +440,18 @@ def get_artetal_movies(period: Dict) -> List[Dict]:
 
             time.sleep(0.5)
 
-        # Ajouter les infos éditoriales à chaque film
+        # Ajouter les infos éditoriales et urgence à chaque film
         for movie in all_movies:
             is_telerama, stars = get_telerama_info(movie["title"])
             movie["telerama_pick"] = is_telerama
             movie["telerama_stars"] = stars
             movie["cahiers_pick"] = get_cahiers_info(movie["title"])
+            # Urgence par défaut pour les films (durée limitée en salle)
+            movie["urgency"] = {
+                "score": 0.3,
+                "label": "Durée limitée en salle",
+                "alert": False
+            }
 
         # Filtrer les films intéressants
         filtered_movies = [

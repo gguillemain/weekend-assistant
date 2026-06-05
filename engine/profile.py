@@ -623,3 +623,205 @@ def get_recommendations_for_prompt() -> str:
         lines.append(line)
 
     return "\n".join(lines)
+
+
+# ============================================================
+# Projets de vie
+# ============================================================
+
+def get_active_projects() -> List[Dict]:
+    """
+    Retourne les projets de vie actifs.
+
+    Returns:
+        Liste de projets (status='actif'), triés par priority DESC
+    """
+    conn = get_connection()
+    cursor = conn.cursor()
+
+    cursor.execute("""
+        SELECT id, title, category, keywords, status, priority, notes, added_at
+        FROM life_projects
+        WHERE status = 'actif'
+        ORDER BY priority DESC, added_at ASC
+    """)
+
+    results = []
+    for row in cursor.fetchall():
+        project = dict(row)
+        # Désérialiser les keywords
+        if project.get("keywords"):
+            try:
+                project["keywords"] = json.loads(project["keywords"])
+            except json.JSONDecodeError:
+                project["keywords"] = []
+        else:
+            project["keywords"] = []
+        results.append(project)
+
+    conn.close()
+    return results
+
+
+def match_projects(content: str) -> List[Dict]:
+    """
+    Cherche les projets qui matchent le contenu.
+
+    Args:
+        content: Texte à analyser (titre + description)
+
+    Returns:
+        Liste des projets matchés
+    """
+    if not content:
+        return []
+
+    content_lower = normalize_for_matching(content)
+    projects = get_active_projects()
+    matches = []
+
+    for project in projects:
+        keywords = project.get("keywords", [])
+        for keyword in keywords:
+            keyword_normalized = normalize_for_matching(keyword)
+            if keyword_normalized in content_lower:
+                matches.append(project)
+                break
+
+    return matches
+
+
+def mark_project_accomplished(project_id: int) -> None:
+    """
+    Marque un projet comme accompli.
+
+    Args:
+        project_id: ID du projet
+    """
+    conn = get_connection()
+    cursor = conn.cursor()
+
+    cursor.execute("""
+        UPDATE life_projects
+        SET status = 'accompli', accomplished_at = ?
+        WHERE id = ?
+    """, (datetime.now().isoformat(), project_id))
+
+    conn.commit()
+    conn.close()
+
+
+def add_project(
+    title: str,
+    category: str,
+    keywords: List[str],
+    priority: int = 2,
+    notes: str = ""
+) -> int:
+    """
+    Ajoute un nouveau projet de vie.
+
+    Args:
+        title: Titre du projet
+        category: Catégorie (voyage, culture, sport, famille, gastronomie)
+        keywords: Liste de mots-clés pour le matching
+        priority: 1=rêve, 2=envie, 3=urgent
+        notes: Notes optionnelles
+
+    Returns:
+        ID du projet créé
+    """
+    conn = get_connection()
+    cursor = conn.cursor()
+
+    cursor.execute("""
+        INSERT INTO life_projects (title, category, keywords, priority, notes)
+        VALUES (?, ?, ?, ?, ?)
+    """, (title, category, json.dumps(keywords, ensure_ascii=False), priority, notes))
+
+    project_id = cursor.lastrowid
+    conn.commit()
+    conn.close()
+
+    return project_id
+
+
+def get_projects_for_prompt() -> str:
+    """
+    Retourne une string formatée des projets pour le prompt Claude.
+
+    Returns:
+        Texte formaté avec les projets actifs
+    """
+    projects = get_active_projects()
+
+    if not projects:
+        return ""
+
+    priority_emoji = {1: "⭐", 2: "💛", 3: "🔥"}
+    lines = ["Projets de vie en cours :"]
+
+    for project in projects:
+        emoji = priority_emoji.get(project["priority"], "💛")
+        lines.append(f"- {emoji} {project['title']}")
+
+    return "\n".join(lines)
+
+
+# ============================================================
+# Mémoires (il y a un an)
+# ============================================================
+
+def get_memories() -> List[Dict]:
+    """
+    Retourne les activités d'il y a environ un an.
+
+    Returns:
+        Liste d'activités avec label formaté
+    """
+    conn = get_connection()
+    cursor = conn.cursor()
+
+    cursor.execute("""
+        SELECT id, period_label, period_start, category, note,
+               films_seen, concerts_seen, expos_seen, hiking_seen
+        FROM activity_log
+        WHERE period_start BETWEEN date('now', '-13 months') AND date('now', '-11 months')
+        ORDER BY period_start DESC
+        LIMIT 5
+    """)
+
+    results = []
+    for row in cursor.fetchall():
+        activity = dict(row)
+
+        # Désérialiser JSON fields
+        for field in ['films_seen', 'concerts_seen', 'expos_seen', 'hiking_seen']:
+            if activity.get(field):
+                try:
+                    activity[field] = json.loads(activity[field])
+                except json.JSONDecodeError:
+                    activity[field] = []
+            else:
+                activity[field] = []
+
+        # Construire le label
+        details = []
+        if activity['films_seen']:
+            details.append(f"Film : {activity['films_seen'][0]}")
+        if activity['concerts_seen']:
+            details.append(f"Concert : {activity['concerts_seen'][0]}")
+        if activity['expos_seen']:
+            details.append(f"Expo : {activity['expos_seen'][0]}")
+        if activity['hiking_seen']:
+            details.append(f"Rando : {activity['hiking_seen'][0]}")
+        if activity.get('note'):
+            details.append(activity['note'])
+
+        detail_str = details[0] if details else activity.get('category', 'activité')
+        activity['memory_label'] = f"Il y a un an : {detail_str}"
+
+        results.append(activity)
+
+    conn.close()
+    return results

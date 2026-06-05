@@ -1183,6 +1183,89 @@
         .vacation-calendar-strip .sep {
             color: var(--gray-light);
         }
+
+        /* Badge urgence */
+        .badge-urgent {
+            background: #fff3cd;
+            color: #856404;
+            border: 1px solid #ffc107;
+            font-size: 11px;
+            padding: 2px 8px;
+            border-radius: 20px;
+            margin-left: 8px;
+        }
+
+        /* Section projets de vie */
+        .projects-section {
+            margin-top: 2rem;
+        }
+
+        .projects-grid {
+            display: flex;
+            flex-direction: column;
+            gap: 0.75rem;
+        }
+
+        .project-card {
+            background: var(--white);
+            border-radius: 10px;
+            padding: 1rem;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.05);
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        .project-card .priority-emoji {
+            font-size: 1.3rem;
+        }
+
+        .project-card .project-content {
+            flex: 1;
+        }
+
+        .project-card .project-title {
+            font-weight: 500;
+            margin-bottom: 0.25rem;
+        }
+
+        .badge-category {
+            display: inline-block;
+            background: var(--gray-light);
+            color: var(--gray);
+            font-size: 0.7rem;
+            padding: 2px 8px;
+            border-radius: 10px;
+        }
+
+        .project-card .project-done-btn {
+            background: var(--gray-light);
+            border: none;
+            padding: 0.5rem 1rem;
+            border-radius: 20px;
+            cursor: pointer;
+            font-size: 0.85rem;
+            transition: background 0.2s;
+        }
+
+        .project-card .project-done-btn:hover {
+            background: var(--sage);
+            color: var(--white);
+        }
+
+        /* Encart mémoires */
+        .memories-strip {
+            margin-top: 2rem;
+            padding: 12px 16px;
+            background: #f0f4f0;
+            border-radius: 8px;
+            font-size: 0.9rem;
+            color: var(--anthracite);
+        }
+
+        .memories-strip .memory-icon {
+            margin-right: 8px;
+        }
     </style>
 </head>
 <body{% if is_vacation %} class="vacation-mode"{% endif %}>
@@ -1582,6 +1665,20 @@
                 <!-- Rempli dynamiquement -->
             </div>
         </section>
+
+        <!-- Section projets de vie -->
+        <section class="projects-section" id="projects-section" style="display: none;">
+            <h2 class="section-title">🎯 Vos projets</h2>
+            <div class="projects-grid" id="projects-grid">
+                <!-- Rempli dynamiquement -->
+            </div>
+        </section>
+
+        <!-- Encart mémoires (il y a un an) -->
+        <div class="memories-strip" id="memories-strip" style="display: none;">
+            <span class="memory-icon">📅</span>
+            <span id="memory-text"></span>
+        </div>
         </div>
 
         <!-- Tab Content: History -->
@@ -2233,6 +2330,93 @@
 
         // Charger au démarrage
         loadRecommendations();
+        loadProjects();
+        loadMemories();
+
+        // === Système de projets de vie ===
+        var priorityEmoji = {1: '⭐', 2: '💛', 3: '🔥'};
+
+        function loadProjects() {
+            fetch('./projects')
+                .then(function(response) { return response.json(); })
+                .then(function(data) {
+                    var section = document.getElementById('projects-section');
+                    var grid = document.getElementById('projects-grid');
+                    var projects = data.projects || [];
+
+                    if (projects.length === 0) {
+                        section.style.display = 'none';
+                        return;
+                    }
+
+                    section.style.display = 'block';
+                    var html = '';
+
+                    projects.forEach(function(project) {
+                        var emoji = priorityEmoji[project.priority] || '💛';
+
+                        html += '<div class="project-card" data-id="' + project.id + '">';
+                        html += '  <span class="priority-emoji">' + emoji + '</span>';
+                        html += '  <div class="project-content">';
+                        html += '    <div class="project-title">' + escapeHtml(project.title) + '</div>';
+                        if (project.category) {
+                            html += '    <span class="badge-category">' + escapeHtml(project.category) + '</span>';
+                        }
+                        html += '  </div>';
+                        html += '  <button class="project-done-btn" data-id="' + project.id + '">✓ Accompli !</button>';
+                        html += '</div>';
+                    });
+
+                    grid.innerHTML = html;
+
+                    // Ajouter les listeners
+                    grid.querySelectorAll('.project-done-btn').forEach(function(btn) {
+                        btn.addEventListener('click', function() {
+                            var projectId = this.dataset.id;
+                            var card = this.closest('.project-card');
+
+                            fetch('./projects/' + projectId + '/done', {
+                                method: 'POST'
+                            })
+                            .then(function(response) { return response.json(); })
+                            .then(function(result) {
+                                if (result.ok) {
+                                    card.style.opacity = '0.5';
+                                    card.style.textDecoration = 'line-through';
+                                    setTimeout(function() {
+                                        loadProjects();
+                                    }, 1000);
+                                }
+                            });
+                        });
+                    });
+                })
+                .catch(function(err) {
+                    console.error('Erreur chargement projets:', err);
+                });
+        }
+
+        // === Mémoires (il y a un an) ===
+        function loadMemories() {
+            fetch('./memories')
+                .then(function(response) { return response.json(); })
+                .then(function(data) {
+                    var strip = document.getElementById('memories-strip');
+                    var text = document.getElementById('memory-text');
+                    var memories = data.memories || [];
+
+                    if (memories.length === 0) {
+                        strip.style.display = 'none';
+                        return;
+                    }
+
+                    strip.style.display = 'block';
+                    text.textContent = memories[0].memory_label;
+                })
+                .catch(function(err) {
+                    console.error('Erreur chargement mémoires:', err);
+                });
+        }
     </script>
 </body>
 </html>

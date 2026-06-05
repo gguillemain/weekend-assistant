@@ -19,6 +19,40 @@ _session = requests.Session()
 BASE_LAT = config.BASE_LOCATION["lat"]
 BASE_LON = config.BASE_LOCATION["lon"]
 
+
+def compute_concert_urgency(concert_date) -> dict:
+    """
+    Calcule le score d'urgence pour un concert.
+
+    Args:
+        concert_date: Date du concert
+
+    Returns:
+        Dict avec score, label, alert
+    """
+    if not concert_date:
+        return {"score": 0.3, "label": "", "alert": False}
+
+    # Convertir si c'est une string
+    if isinstance(concert_date, str):
+        try:
+            concert_date = datetime.strptime(concert_date, "%Y-%m-%d").date()
+        except ValueError:
+            return {"score": 0.3, "label": "", "alert": False}
+
+    days = (concert_date - date.today()).days
+
+    if days < 0:
+        return {"score": 0, "label": "passé", "alert": False}
+    elif days <= 3:
+        return {"score": 1.0, "label": f"Dans {days} jour{'s' if days > 1 else ''} !", "alert": True}
+    elif days <= 10:
+        return {"score": 0.9, "label": f"Dans {days} jours", "alert": True}
+    elif days <= 21:
+        return {"score": 0.5, "label": "", "alert": False}
+    else:
+        return {"score": 0.2, "label": "", "alert": False}
+
 # API Ticketmaster
 TICKETMASTER_BASE_URL = "https://app.ticketmaster.com/discovery/v2/events.json"
 
@@ -417,7 +451,7 @@ def get_concerts(period: Dict, profile: Dict, verbose: bool = False) -> List[Dic
 
     unique_concerts = history_filtered
 
-    # Calculer profile_match pour chaque concert
+    # Calculer profile_match et urgency pour chaque concert
     for concert in unique_concerts:
         concert["profile_match"] = _calculate_profile_match(
             concert["artist"],
@@ -425,6 +459,7 @@ def get_concerts(period: Dict, profile: Dict, verbose: bool = False) -> List[Dic
             concert["venue"],
             profile
         )
+        concert["urgency"] = compute_concert_urgency(concert.get("date"))
 
     # Trier par profile_match décroissant
     unique_concerts.sort(key=lambda x: (-x["profile_match"], x["distance_km"]))
@@ -440,8 +475,13 @@ def format_concerts_context(concerts: List[Dict]) -> str:
     if not concerts:
         return "Concerts : aucun concert trouvé pour cette période."
 
-    top_concerts = concerts[:5]
-    lines = ["Concerts à venir sur la période :"]
+    # Trier par urgency score décroissant, puis profile_match
+    sorted_concerts = sorted(
+        concerts,
+        key=lambda x: (-x.get("urgency", {}).get("score", 0), -x.get("profile_match", 0))
+    )
+    top_concerts = sorted_concerts[:5]
+    lines = ["Concerts à venir (triés par urgence) :"]
 
     for concert in top_concerts:
         # Gérer date qui peut être date, str (depuis cache JSON) ou None
@@ -467,6 +507,12 @@ def format_concerts_context(concerts: List[Dict]) -> str:
         match_str = f"Match profil : {concert['profile_match']:.1f}"
 
         lines.append(f"- {concert['artist']} — {concert['venue']} ({concert['city']}, {concert['distance_km']}km)")
+
+        # Ajouter l'alerte urgence si présente
+        urgency = concert.get("urgency", {})
+        if urgency.get("alert"):
+            lines.append(f"  ⚠️ {urgency['label']}")
+
         lines.append(f"  {date_str} à {concert['time']}{price_str}")
         lines.append(f"  {match_str}")
 
