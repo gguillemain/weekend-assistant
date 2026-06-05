@@ -220,6 +220,14 @@
             color: var(--white);
         }
 
+        .badge-combo {
+            background: #f3e5f5;
+            color: #6a1b9a;
+            font-size: 11px;
+            padding: 2px 8px;
+            border-radius: 20px;
+        }
+
         .vacation-mode header {
             background: linear-gradient(135deg, #7C9A7E 0%, #5D8A9F 100%);
         }
@@ -1951,6 +1959,9 @@
                     <h3><span class="suggestion-emoji">{{ suggestion.emoji }}</span>{{ suggestion.title }}</h3>
                     <p class="description">{{ suggestion.description }}</p>
                     <div class="suggestion-meta">
+                        {% if suggestion.is_combo or suggestion.type == 'combo' or '+' in suggestion.title %}
+                        <span class="badge badge-combo">Journée complète</span>
+                        {% endif %}
                         {% if suggestion.day %}
                         <span class="badge badge-day">📅 {{ suggestion.day }}</span>
                         {% endif %}

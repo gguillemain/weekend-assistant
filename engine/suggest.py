@@ -2,11 +2,273 @@ import anthropic
 import json
 from concurrent.futures import ThreadPoolExecutor
 from datetime import date, datetime
-from typing import Dict, List
+from typing import Dict, List, Optional
 
 from engine import calendar_engine, profile
 from engine.travel_engine import generate_travel_suggestions
 from collectors import weather, cinema, events, hiking, cycling, travel, concerts, exhibitions, discovery, restaurants
+
+
+# =============================================================================
+# DISTANCES DEPUIS GUEBWILLER (en km)
+# =============================================================================
+
+CITY_DISTANCES = {
+    "Guebwiller": 0,
+    "Soultz": 3,
+    "Rimbach": 8,
+    "Lautenbach": 6,
+    "Murbach": 5,
+    "Buhl": 4,
+    "Orschwihr": 8,
+    "Rouffach": 10,
+    "Pfaffenheim": 12,
+    "Munster": 20,
+    "Colmar": 25,
+    "Kaysersberg": 28,
+    "Riquewihr": 30,
+    "Ribeauvillé": 35,
+    "Turckheim": 22,
+    "Mulhouse": 25,
+    "Thann": 12,
+    "Cernay": 10,
+    "Bâle": 50,
+    "Basel": 50,
+    "Riehen": 52,
+    "Strasbourg": 90,
+    "Freiburg": 60,
+    "Belfort": 55,
+    "Ensisheim": 15,
+    "Eguisheim": 18,
+    "Wintzenheim": 20,
+}
+
+
+# =============================================================================
+# COMBINAISONS D'ACTIVITÉS
+# =============================================================================
+
+def build_combos(
+    weather_data: Dict,
+    movies: List[Dict],
+    hikes: List[Dict],
+    restaurants_list: List[Dict],
+    exhibitions_list: List[Dict],
+    cycling_list: List[Dict],
+    user_profile: Dict
+) -> List[Dict]:
+    """
+    Construit des combinaisons d'activités logiques avant d'appeler Claude.
+    Retourne une liste de combos prêts à être narrés.
+    """
+    combos = []
+    days = weather_data.get("days", [])
+    today_weather = days[0] if days else {}
+    outdoor_ok = today_weather.get("suitable_outdoor", False)
+
+    # Helper : restaurant le plus proche d'une ville donnée
+    def nearest_restaurant(city: str, restos: List[Dict], max_km: int = 30) -> Optional[Dict]:
+        if not city or not restos:
+            return None
+        city_dist = CITY_DISTANCES.get(city, 999)
+        candidates = []
+        for r in restos:
+            r_city = r.get("city", "")
+            r_dist = CITY_DISTANCES.get(r_city, 999)
+            proximity = abs(city_dist - r_dist)
+            if proximity <= max_km:
+                candidates.append((proximity, r))
+        if candidates:
+            candidates.sort(key=lambda x: x[0])
+            return candidates[0][1]
+        return None
+
+    # ── COMBO 1 : Rando + Resto proche ──────
+    if outdoor_ok and hikes:
+        for hike in hikes[:3]:
+            start_city = hike.get("start_city", "")
+            resto = nearest_restaurant(start_city, restaurants_list)
+            if resto:
+                combos.append({
+                    "type": "rando_midi",
+                    "emoji": "🥾🍽️",
+                    "title": f"{hike.get('title', 'Randonnée')} + {resto.get('title', resto.get('name', 'Restaurant'))}",
+                    "parts": {
+                        "rando": hike,
+                        "restaurant": resto
+                    },
+                    "timing": "Matin rando · Déjeuner en chemin",
+                    "score": (
+                        hike.get("weather_score", 0.5) * 0.5 +
+                        resto.get("value_score", 0.5) * 0.5
+                    )
+                })
+
+    # ── COMBO 2 : Vélo + Winstub ─────────────
+    if outdoor_ok and cycling_list:
+        winstubs = [r for r in restaurants_list
+                    if r.get("cuisine", "").lower() in ["winstub", "alsacienne", "alsacien"]]
+        if not winstubs:
+            winstubs = restaurants_list[:1]  # Fallback premier resto
+        for ride in cycling_list[:2]:
+            if winstubs:
+                winstub = winstubs[0]
+                combos.append({
+                    "type": "velo_winstub",
+                    "emoji": "🚴🍺",
+                    "title": f"{ride.get('title', 'Sortie vélo')} + {winstub.get('title', winstub.get('name', 'Winstub'))}",
+                    "parts": {
+                        "cycling": ride,
+                        "restaurant": winstub
+                    },
+                    "timing": "Sortie VAE · Winstub à l'arrivée",
+                    "score": (
+                        ride.get("bike_score", 0.5) * 0.5 +
+                        winstub.get("value_score", 0.5) * 0.5
+                    )
+                })
+
+    # ── COMBO 3 : Ciné Florival + balade ─────
+    florival = [m for m in movies if "Florival" in m.get("cinemas", m.get("cinemas_display", ""))]
+    if florival:
+        film = florival[0]
+        combos.append({
+            "type": "cinema_ville",
+            "emoji": "🎬🚶",
+            "title": f"{film.get('title', 'Film')} + balade Guebwiller",
+            "parts": {
+                "cinema": film,
+                "balade": {
+                    "city": "Guebwiller",
+                    "description": "Centre historique, vignes, canal"
+                }
+            },
+            "timing": "Séance + flânerie avant ou après",
+            "score": (film.get("press_rating", 3.5) or 3.5) / 5
+        })
+
+    # ── COMBO 4 : Expo + Resto même zone ─────
+    for expo in exhibitions_list[:3]:
+        expo_city = expo.get("city", "")
+        resto = nearest_restaurant(expo_city, restaurants_list, max_km=15)
+        if resto and expo.get("profile_match", 0) > 0.2:
+            combos.append({
+                "type": "expo_gastro",
+                "emoji": "🖼️🍽️",
+                "title": f"{expo.get('title', 'Exposition')} + {resto.get('title', resto.get('name', 'Restaurant'))}",
+                "parts": {
+                    "expo": expo,
+                    "restaurant": resto
+                },
+                "timing": "Visite expo · Déjeuner ou dîner",
+                "score": (
+                    expo.get("profile_match", 0.3) * 0.5 +
+                    resto.get("value_score", 0.5) * 0.5
+                )
+            })
+
+    # ── COMBO 5 : Journée Bâle complète ──────
+    bale_expos = [e for e in exhibitions_list
+                  if any(x in e.get("city", "") for x in ["Bâle", "Basel", "Riehen"])]
+    bale_restos = [r for r in restaurants_list
+                   if any(x in r.get("city", "") for x in ["Bâle", "Basel"])]
+    if bale_expos and bale_restos:
+        combos.append({
+            "type": "escapade_bale",
+            "emoji": "🏛️🇨🇭",
+            "title": f"Journée Bâle — {bale_expos[0].get('title', 'Expo')}",
+            "parts": {
+                "expo": bale_expos[0],
+                "restaurant": bale_restos[0],
+                "balade": {
+                    "city": "Bâle",
+                    "description": "Vieille ville, Rhin, musées"
+                }
+            },
+            "timing": "Matin expo · Déjeuner · Après-midi vieille ville",
+            "score": (
+                bale_expos[0].get("profile_match", 0.3) * 0.6 +
+                bale_restos[0].get("value_score", 0.5) * 0.4
+            )
+        })
+
+    # ── COMBO 6 : Ciné Colmar + balade ───────
+    colmar_films = [m for m in movies
+                    if any(x in m.get("cinemas", m.get("cinemas_display", ""))
+                           for x in ["Palace", "Colmar", "CGR"])]
+    if colmar_films:
+        film = colmar_films[0]
+        combos.append({
+            "type": "cinema_ville",
+            "emoji": "🎬🏘️",
+            "title": f"{film.get('title', 'Film')} + balade Colmar",
+            "parts": {
+                "cinema": film,
+                "balade": {
+                    "city": "Colmar",
+                    "description": "Petite Venise, centre historique"
+                }
+            },
+            "timing": "Séance + Colmar avant ou après",
+            "score": (film.get("press_rating", 3.5) or 3.5) / 5
+        })
+
+    # Trier par score décroissant
+    combos.sort(key=lambda x: x.get("score", 0), reverse=True)
+
+    return combos[:5]  # Top 5 combos
+
+
+def _format_combos_context(combos: List[Dict]) -> str:
+    """Formate les combinaisons pour le contexte Claude."""
+    if not combos:
+        return ""
+
+    lines = [
+        "=== COMBINAISONS SUGGÉRÉES ===",
+        "Ces associations sont pré-construites et prêtes à narrer.",
+        "Privilégie-les comme base de suggestions.",
+        ""
+    ]
+
+    for combo in combos:
+        lines.append(f"[{combo.get('emoji', '📌')}] {combo.get('title', 'Combo')}")
+        lines.append(f"  Timing : {combo.get('timing', '')}")
+
+        parts = combo.get("parts", {})
+
+        if parts.get("rando"):
+            rando = parts["rando"]
+            lines.append(f"  Rando : {rando.get('title', 'NC')} ({rando.get('distance_km', 0):.1f}km, {rando.get('elevation_gain', 0)}m D+)")
+
+        if parts.get("cycling"):
+            ride = parts["cycling"]
+            lines.append(f"  Vélo : {ride.get('title', 'NC')} ({ride.get('distance_km', 0):.0f}km)")
+
+        if parts.get("restaurant"):
+            resto = parts["restaurant"]
+            distinction = resto.get("distinction", resto.get("price_level", ""))
+            lines.append(f"  Resto : {resto.get('title', resto.get('name', 'NC'))} ({resto.get('city', 'NC')}, {distinction})")
+
+        if parts.get("expo"):
+            expo = parts["expo"]
+            date_end = expo.get("date_end", "")
+            lines.append(f"  Expo : {expo.get('title', 'NC')} ({expo.get('venue', 'NC')}, jusqu'au {date_end})")
+
+        if parts.get("cinema"):
+            film = parts["cinema"]
+            cinemas = film.get("cinemas", film.get("cinemas_display", "NC"))
+            rating = film.get("press_rating", 0) or 0
+            lines.append(f"  Film : {film.get('title', 'NC')} ({cinemas}, {rating:.1f}/5)")
+
+        if parts.get("balade"):
+            balade = parts["balade"]
+            lines.append(f"  Balade : {balade.get('city', 'NC')} — {balade.get('description', '')}")
+
+        lines.append("")
+
+    lines.append("================================")
+    return "\n".join(lines)
 
 
 BASE_SYSTEM_PROMPT = """Tu es un assistant personnel de loisirs pour un couple
@@ -60,6 +322,15 @@ moins de 14 jours, signalée par ⚠️), mentionne-le explicitement dans
 la suggestion avec une formulation naturelle du type "dernière chance",
 "plus que X jours", "avant la fermeture". Traite ces opportunités comme
 prioritaires sauf si la météo ou le calendrier s'y oppose franchement.
+
+Tu reçois des combinaisons d'activités pré-construites
+(rando+resto, ciné+balade, expo+gastronomie...).
+Utilise-les comme base pour tes suggestions en les narrant
+comme une journée complète et cohérente.
+Une bonne suggestion combo décrit le déroulement de la
+journée de façon fluide : heure de départ, activité principale,
+pause repas, retour. Elle donne envie de sortir tout de suite.
+Ajoute la distance totale et le budget estimé quand c'est pertinent.
 
 Tu proposes des idées concrètes, bien argumentées,
 adaptées à la météo et aux événements réels fournis.
@@ -324,7 +595,7 @@ Mélange city breaks proches et destinations plus lointaines si la durée le per
 {request}"""
 
 
-def _build_user_prompt(period: Dict, weather_data: Dict, movies: List[Dict], events_list: List[Dict], hikes: List[Dict], cycling_list: List[Dict] = None, concerts_list: List[Dict] = None, exhibitions_list: List[Dict] = None, discovery_list: List[Dict] = None, restaurants_list: List[Dict] = None) -> str:
+def _build_user_prompt(period: Dict, weather_data: Dict, movies: List[Dict], events_list: List[Dict], hikes: List[Dict], cycling_list: List[Dict] = None, concerts_list: List[Dict] = None, exhibitions_list: List[Dict] = None, discovery_list: List[Dict] = None, restaurants_list: List[Dict] = None, combos: List[Dict] = None) -> str:
     """Construit le prompt utilisateur complet."""
     period_info = f"""Période : {period['label']}
 Dates : du {period['start'].strftime('%d/%m/%Y')} au {period['end'].strftime('%d/%m/%Y')}
@@ -332,6 +603,7 @@ Durée : {period['days']} jours
 Mode : {period['mode']}"""
 
     weather_context = _format_weather_context(weather_data)
+    combos_context = _format_combos_context(combos) if combos else ""
     movies_context = _format_movies_context(movies)
     events_context = _format_events_context(events_list)
     hiking_context = _format_hiking_context(hikes)
@@ -354,7 +626,8 @@ Réponds UNIQUEMENT en JSON valide avec ce format exact :
       "description": "Description de 3-4 phrases expliquant l'activité et pourquoi c'est adapté à la météo.",
       "day": "Samedi",
       "logistics": "Spontané",
-      "type": "cinema"
+      "type": "cinema",
+      "is_combo": false
     }
   ]
 }
@@ -362,13 +635,18 @@ Réponds UNIQUEMENT en JSON valide avec ce format exact :
 Valeurs possibles :
 - day : "Samedi", "Dimanche", "Lundi", "Flexible"
 - logistics : "Spontané", "À réserver", "À planifier"
-- type : "cinema", "rando", "vélo", "culture", "exposition", "gastronomie", "concert", "découverte", "autre"
+- type : "cinema", "rando", "vélo", "culture", "exposition", "gastronomie", "concert", "découverte", "combo", "autre"
+- is_combo : true si la suggestion est basée sur une combinaison pré-construite, false sinon
 
-Privilégie la variété : mélange cinéma, randonnée, vélo, exposition, concert, découverte si possible."""
+Privilégie les combinaisons pré-construites quand elles sont disponibles.
+Pour les combos, utilise type="combo" et is_combo=true.
+Mélange cinéma, randonnée, vélo, exposition, concert, découverte si possible."""
 
     return f"""{period_info}
 
 {weather_context}
+
+{combos_context}
 
 {movies_context}
 
@@ -455,7 +733,19 @@ def generate_suggestions(period: Dict) -> Dict:
         hikes = hiking.get_hiking_suggestions(period, weather_data)
         cycling_list = cycling.get_cycling_suggestions(period, weather_data)
 
-        user_prompt = _build_user_prompt(period, weather_data, movies, events_list, hikes, cycling_list, concerts_list, exhibitions_list, discovery_list, restaurants_list)
+        # Construire les combinaisons d'activités
+        combos = build_combos(
+            weather_data=weather_data,
+            movies=movies,
+            hikes=hikes,
+            restaurants_list=restaurants_list,
+            exhibitions_list=exhibitions_list,
+            cycling_list=cycling_list,
+            user_profile=user_profile
+        )
+        print(f"  Combos : {len(combos)} combinaisons construites")
+
+        user_prompt = _build_user_prompt(period, weather_data, movies, events_list, hikes, cycling_list, concerts_list, exhibitions_list, discovery_list, restaurants_list, combos)
         system_prompt = BASE_SYSTEM_PROMPT.format(profile_section=profile_section)
         travel_data = {}
 
@@ -510,6 +800,7 @@ def generate_suggestions(period: Dict) -> Dict:
         "exhibitions": exhibitions_list[:4] if exhibitions_list else [],
         "discovery": discovery_list[:4] if discovery_list else [],
         "restaurants": restaurants_list[:3] if restaurants_list else [],
+        "combos": combos if not is_vacation else [],
         "travel": travel_data if is_vacation else {},
         "is_vacation": is_vacation,
         "suggestions": suggestions,
