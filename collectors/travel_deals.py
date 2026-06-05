@@ -223,7 +223,15 @@ def get_travel_deals(vacation_period: Optional[Dict] = None) -> List[TravelDeal]
         for deal in valid_deals:
             # Garder si le deal est valide pour la période
             if deal.valid_from and deal.valid_to:
-                if deal.valid_from <= end and deal.valid_to >= start:
+                # Convertir les dates du deal si nécessaire (peut venir du cache)
+                deal_from = deal.valid_from
+                deal_to = deal.valid_to
+                if isinstance(deal_from, str):
+                    deal_from = datetime.strptime(deal_from, "%Y-%m-%d").date()
+                if isinstance(deal_to, str):
+                    deal_to = datetime.strptime(deal_to, "%Y-%m-%d").date()
+
+                if deal_from <= end and deal_to >= start:
                     filtered.append(deal)
             else:
                 filtered.append(deal)
