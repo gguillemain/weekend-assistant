@@ -608,6 +608,65 @@ def projects_done_route(project_id):
     return jsonify({"ok": True})
 
 
+@app.route("/projects/<int:project_id>", methods=["DELETE"])
+def projects_delete_route(project_id):
+    """Supprime un projet."""
+    profile.delete_project(project_id)
+    return jsonify({"ok": True})
+
+
+@app.route("/projects/suggestions")
+def projects_suggestions_route():
+    """Génère des suggestions de projets via Claude."""
+    import anthropic
+
+    # Récupérer les projets existants
+    existing_projects = profile.get_active_projects()
+    existing_titles = [p["title"] for p in existing_projects]
+
+    prompt = f"""Voici le profil d'un couple d'enseignants alsaciens (50 ans, Guebwiller) :
+- Musique : The Cure, Fontaines D.C., jazz, new wave, Bertrand Belin
+- Art : Soulages, Banksy, surréalistes, Fondation Beyeler
+- Activités : cinéma Art & Essai, randonnée (300m dénivelé max), vélo VAE, gastronomie
+- Voyages : lacs italiens, capitales européennes, Londres, nature douce
+
+Propose 10 projets de vie / destinations rêvées adaptés à ce profil que je n'ai pas encore dans ma liste :
+{chr(10).join('- ' + t for t in existing_titles) if existing_titles else '(liste vide)'}
+
+Format JSON strict, uniquement le tableau, sans markdown :
+[
+  {{
+    "title": "string",
+    "category": "voyage|culture|sport|gastronomie|famille|autre",
+    "keywords": ["mot1", "mot2", "mot3"],
+    "priority": 1 ou 2 ou 3,
+    "notes": "une phrase max"
+  }}
+]"""
+
+    try:
+        client = anthropic.Anthropic(api_key=config.ANTHROPIC_API_KEY)
+        response = client.messages.create(
+            model="claude-sonnet-4-20250514",
+            max_tokens=1500,
+            messages=[{"role": "user", "content": prompt}]
+        )
+
+        # Parser le JSON
+        content = response.content[0].text.strip()
+        # Nettoyer si wrapped dans ```json
+        if content.startswith("```"):
+            content = content.split("\n", 1)[1]
+            content = content.rsplit("```", 1)[0]
+
+        suggestions = json.loads(content)
+        return jsonify({"suggestions": suggestions})
+
+    except Exception as e:
+        print(f"[projects/suggestions] Erreur : {e}")
+        return jsonify({"error": str(e)}), 500
+
+
 @app.route("/memories")
 def memories_route():
     """Retourne les activités d'il y a un an."""

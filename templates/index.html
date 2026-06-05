@@ -1200,57 +1200,268 @@
             margin-top: 2rem;
         }
 
-        .projects-grid {
+        .projects-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1rem;
+        }
+
+        .projects-header h2 {
+            margin: 0;
+            border: none;
+            padding: 0;
+        }
+
+        .btn-add-project {
+            background: transparent;
+            border: 1px solid var(--gray-light);
+            color: var(--gray);
+            padding: 0.4rem 0.8rem;
+            border-radius: 20px;
+            cursor: pointer;
+            font-size: 0.85rem;
+            transition: all 0.2s;
+        }
+
+        .btn-add-project:hover {
+            border-color: var(--sage);
+            color: var(--sage);
+        }
+
+        .projects-group {
+            margin-bottom: 1.25rem;
+        }
+
+        .projects-group-title {
+            font-size: 0.9rem;
+            color: var(--gray);
+            margin-bottom: 0.5rem;
+            font-weight: 500;
+        }
+
+        .projects-pills {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+        }
+
+        .project-pill {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            background: var(--white);
+            border: 1px solid var(--gray-light);
+            border-radius: 25px;
+            padding: 0.5rem 0.75rem;
+            font-size: 0.9rem;
+            transition: all 0.3s;
+        }
+
+        .project-pill.accomplishing {
+            text-decoration: line-through;
+            opacity: 0.5;
+            transform: scale(0.95);
+        }
+
+        .project-pill.deleting {
+            opacity: 0;
+            transform: scale(0.8);
+        }
+
+        .project-pill .pill-emoji {
+            font-size: 1rem;
+        }
+
+        .project-pill .pill-title {
+            color: var(--anthracite);
+        }
+
+        .project-pill .pill-actions {
+            display: flex;
+            gap: 0.25rem;
+            margin-left: 0.25rem;
+        }
+
+        .project-pill .pill-btn {
+            background: none;
+            border: none;
+            cursor: pointer;
+            font-size: 0.8rem;
+            padding: 0.15rem 0.3rem;
+            border-radius: 4px;
+            opacity: 0.5;
+            transition: opacity 0.2s, background 0.2s;
+        }
+
+        .project-pill .pill-btn:hover {
+            opacity: 1;
+            background: rgba(0,0,0,0.05);
+        }
+
+        .project-pill .pill-btn.done:hover {
+            background: #d4edda;
+        }
+
+        .project-pill .pill-btn.delete:hover {
+            background: #f8d7da;
+        }
+
+        /* Suggestions Claude */
+        .suggestions-panel {
+            margin-top: 1.5rem;
+            padding: 1rem;
+            background: #f8f9fa;
+            border-radius: 10px;
+            display: none;
+        }
+
+        .suggestions-panel.visible {
+            display: block;
+        }
+
+        .suggestions-panel-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1rem;
+        }
+
+        .suggestions-panel-title {
+            font-size: 0.95rem;
+            font-weight: 500;
+            color: var(--anthracite);
+        }
+
+        .btn-close-panel {
+            background: none;
+            border: none;
+            font-size: 1.2rem;
+            cursor: pointer;
+            color: var(--gray);
+        }
+
+        .suggestions-list {
             display: flex;
             flex-direction: column;
             gap: 0.75rem;
         }
 
-        .project-card {
-            background: var(--white);
-            border-radius: 10px;
-            padding: 1rem;
-            box-shadow: 0 2px 6px rgba(0,0,0,0.05);
+        .suggestion-item {
             display: flex;
-            align-items: center;
+            justify-content: space-between;
+            align-items: flex-start;
+            padding: 0.75rem;
+            background: var(--white);
+            border-radius: 8px;
             gap: 1rem;
         }
 
-        .project-card .priority-emoji {
-            font-size: 1.3rem;
-        }
-
-        .project-card .project-content {
+        .suggestion-item-content {
             flex: 1;
         }
 
-        .project-card .project-title {
+        .suggestion-item-title {
             font-weight: 500;
             margin-bottom: 0.25rem;
         }
 
-        .badge-category {
-            display: inline-block;
-            background: var(--gray-light);
-            color: var(--gray);
-            font-size: 0.7rem;
-            padding: 2px 8px;
-            border-radius: 10px;
-        }
-
-        .project-card .project-done-btn {
-            background: var(--gray-light);
-            border: none;
-            padding: 0.5rem 1rem;
-            border-radius: 20px;
-            cursor: pointer;
+        .suggestion-item-notes {
             font-size: 0.85rem;
-            transition: background 0.2s;
+            color: var(--gray);
         }
 
-        .project-card .project-done-btn:hover {
+        .btn-add-suggestion {
             background: var(--sage);
             color: var(--white);
+            border: none;
+            padding: 0.4rem 0.8rem;
+            border-radius: 15px;
+            cursor: pointer;
+            font-size: 0.8rem;
+            white-space: nowrap;
+        }
+
+        .btn-add-suggestion:hover {
+            background: #6B8A6D;
+        }
+
+        .btn-add-suggestion:disabled {
+            background: var(--gray-light);
+            cursor: not-allowed;
+        }
+
+        .btn-claude-suggestions {
+            background: transparent;
+            border: 1px dashed var(--gray-light);
+            color: var(--gray);
+            padding: 0.6rem 1rem;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 0.85rem;
+            width: 100%;
+            margin-top: 0.5rem;
+            transition: all 0.2s;
+        }
+
+        .btn-claude-suggestions:hover {
+            border-color: var(--sage);
+            color: var(--sage);
+        }
+
+        .btn-claude-suggestions:disabled {
+            opacity: 0.6;
+            cursor: wait;
+        }
+
+        /* Modal projet */
+        .priority-radio-group {
+            display: flex;
+            gap: 0.5rem;
+        }
+
+        .priority-radio {
+            flex: 1;
+            position: relative;
+        }
+
+        .priority-radio input {
+            position: absolute;
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+
+        .priority-radio label {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 0.75rem;
+            border: 2px solid var(--gray-light);
+            border-radius: 10px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .priority-radio input:checked + label {
+            border-color: var(--sage);
+            background: #f0f5f0;
+        }
+
+        .priority-radio .emoji {
+            font-size: 1.5rem;
+            margin-bottom: 0.25rem;
+        }
+
+        .priority-radio .label-text {
+            font-size: 0.8rem;
+            color: var(--gray);
+        }
+
+        .form-help {
+            font-size: 0.8rem;
+            color: var(--gray);
+            margin-top: 0.25rem;
         }
 
         /* Encart mémoires */
@@ -1668,9 +1879,41 @@
 
         <!-- Section projets de vie -->
         <section class="projects-section" id="projects-section" style="display: none;">
-            <h2 class="section-title">🎯 Vos projets</h2>
-            <div class="projects-grid" id="projects-grid">
-                <!-- Rempli dynamiquement -->
+            <div class="projects-header">
+                <h2 class="section-title">⭐ Projets & destinations rêvées</h2>
+                <button class="btn-add-project" id="btn-add-project">➕ Ajouter</button>
+            </div>
+
+            <!-- Groupe priorité haute -->
+            <div class="projects-group" id="projects-priority-3" style="display: none;">
+                <div class="projects-group-title">🔥 Priorité haute</div>
+                <div class="projects-pills"></div>
+            </div>
+
+            <!-- Groupe envies -->
+            <div class="projects-group" id="projects-priority-2" style="display: none;">
+                <div class="projects-group-title">💛 Envies</div>
+                <div class="projects-pills"></div>
+            </div>
+
+            <!-- Groupe rêves -->
+            <div class="projects-group" id="projects-priority-1" style="display: none;">
+                <div class="projects-group-title">⭐ Rêves</div>
+                <div class="projects-pills"></div>
+            </div>
+
+            <!-- Bouton suggestions Claude -->
+            <button class="btn-claude-suggestions" id="btn-claude-suggestions">💡 Suggestions Claude</button>
+
+            <!-- Panel suggestions -->
+            <div class="suggestions-panel" id="suggestions-panel">
+                <div class="suggestions-panel-header">
+                    <span class="suggestions-panel-title">💡 Idées pour vous</span>
+                    <button class="btn-close-panel" id="btn-close-suggestions">&times;</button>
+                </div>
+                <div class="suggestions-list" id="suggestions-list">
+                    <!-- Rempli dynamiquement -->
+                </div>
             </div>
         </section>
 
@@ -1743,6 +1986,76 @@
                 <div class="modal-success">
                     <div class="icon">✅</div>
                     <h3>Recommandation ajoutée !</h3>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal ajout projet -->
+    <div class="modal-overlay" id="modal-project">
+        <div class="modal-content">
+            <div id="modal-project-form-view">
+                <div class="modal-header">
+                    <h3>Ajouter un projet</h3>
+                    <button class="modal-close" id="modal-project-close">&times;</button>
+                </div>
+                <form class="modal-form" id="project-form">
+                    <div class="form-group">
+                        <label>📝 Projet / Destination</label>
+                        <input type="text" id="proj-title" placeholder="ex: Voir une expo Banksy à Londres" required>
+                    </div>
+                    <div class="form-group">
+                        <label>📂 Catégorie</label>
+                        <select id="proj-category" required>
+                            <option value="voyage">✈️ Voyage</option>
+                            <option value="culture">🎭 Culture</option>
+                            <option value="sport">🚴 Sport</option>
+                            <option value="gastronomie">🍽️ Gastronomie</option>
+                            <option value="famille">👨‍👩‍👧 Famille</option>
+                            <option value="autre">📌 Autre</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>🎯 Priorité</label>
+                        <div class="priority-radio-group">
+                            <div class="priority-radio">
+                                <input type="radio" name="priority" id="priority-1" value="1">
+                                <label for="priority-1">
+                                    <span class="emoji">⭐</span>
+                                    <span class="label-text">Rêve</span>
+                                </label>
+                            </div>
+                            <div class="priority-radio">
+                                <input type="radio" name="priority" id="priority-2" value="2" checked>
+                                <label for="priority-2">
+                                    <span class="emoji">💛</span>
+                                    <span class="label-text">Envie</span>
+                                </label>
+                            </div>
+                            <div class="priority-radio">
+                                <input type="radio" name="priority" id="priority-3" value="3">
+                                <label for="priority-3">
+                                    <span class="emoji">🔥</span>
+                                    <span class="label-text">À faire !</span>
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label>🏷️ Mots-clés (optionnel)</label>
+                        <input type="text" id="proj-keywords" placeholder="ex: banksy, street art, londres">
+                        <p class="form-help">Pour que l'assistant détecte les opportunités liées</p>
+                    </div>
+                    <div class="modal-actions">
+                        <button type="button" class="btn-cancel" id="modal-project-cancel">Annuler</button>
+                        <button type="submit" class="btn-save">✓ Ajouter</button>
+                    </div>
+                </form>
+            </div>
+            <div id="modal-project-success-view" style="display: none;">
+                <div class="modal-success">
+                    <div class="icon">✅</div>
+                    <h3>Projet ajouté !</h3>
                 </div>
             </div>
         </div>
@@ -2341,7 +2654,6 @@
                 .then(function(response) { return response.json(); })
                 .then(function(data) {
                     var section = document.getElementById('projects-section');
-                    var grid = document.getElementById('projects-grid');
                     var projects = data.projects || [];
 
                     if (projects.length === 0) {
@@ -2350,30 +2662,52 @@
                     }
 
                     section.style.display = 'block';
-                    var html = '';
 
-                    projects.forEach(function(project) {
-                        var emoji = priorityEmoji[project.priority] || '💛';
-
-                        html += '<div class="project-card" data-id="' + project.id + '">';
-                        html += '  <span class="priority-emoji">' + emoji + '</span>';
-                        html += '  <div class="project-content">';
-                        html += '    <div class="project-title">' + escapeHtml(project.title) + '</div>';
-                        if (project.category) {
-                            html += '    <span class="badge-category">' + escapeHtml(project.category) + '</span>';
-                        }
-                        html += '  </div>';
-                        html += '  <button class="project-done-btn" data-id="' + project.id + '">✓ Accompli !</button>';
-                        html += '</div>';
+                    // Grouper par priorité
+                    var byPriority = {1: [], 2: [], 3: []};
+                    projects.forEach(function(p) {
+                        var prio = p.priority || 2;
+                        if (!byPriority[prio]) byPriority[prio] = [];
+                        byPriority[prio].push(p);
                     });
 
-                    grid.innerHTML = html;
+                    // Remplir chaque groupe
+                    [3, 2, 1].forEach(function(prio) {
+                        var group = document.getElementById('projects-priority-' + prio);
+                        var pillsContainer = group.querySelector('.projects-pills');
+                        var projectsInGroup = byPriority[prio] || [];
 
-                    // Ajouter les listeners
-                    grid.querySelectorAll('.project-done-btn').forEach(function(btn) {
-                        btn.addEventListener('click', function() {
+                        if (projectsInGroup.length === 0) {
+                            group.style.display = 'none';
+                            return;
+                        }
+
+                        group.style.display = 'block';
+                        var html = '';
+
+                        projectsInGroup.forEach(function(project) {
+                            var emoji = priorityEmoji[project.priority] || '💛';
+                            html += '<span class="project-pill" data-id="' + project.id + '">';
+                            html += '  <span class="pill-emoji">' + emoji + '</span>';
+                            html += '  <span class="pill-title">' + escapeHtml(project.title) + '</span>';
+                            html += '  <span class="pill-actions">';
+                            html += '    <button class="pill-btn done" data-id="' + project.id + '" title="Marquer accompli">✓</button>';
+                            html += '    <button class="pill-btn delete" data-id="' + project.id + '" title="Supprimer">×</button>';
+                            html += '  </span>';
+                            html += '</span>';
+                        });
+
+                        pillsContainer.innerHTML = html;
+                    });
+
+                    // Ajouter les listeners pour marquer comme accompli
+                    document.querySelectorAll('.pill-btn.done').forEach(function(btn) {
+                        btn.addEventListener('click', function(e) {
+                            e.stopPropagation();
                             var projectId = this.dataset.id;
-                            var card = this.closest('.project-card');
+                            var pill = this.closest('.project-pill');
+
+                            pill.classList.add('accomplishing');
 
                             fetch('./projects/' + projectId + '/done', {
                                 method: 'POST'
@@ -2381,11 +2715,37 @@
                             .then(function(response) { return response.json(); })
                             .then(function(result) {
                                 if (result.ok) {
-                                    card.style.opacity = '0.5';
-                                    card.style.textDecoration = 'line-through';
                                     setTimeout(function() {
                                         loadProjects();
-                                    }, 1000);
+                                    }, 800);
+                                }
+                            });
+                        });
+                    });
+
+                    // Ajouter les listeners pour supprimer
+                    document.querySelectorAll('.pill-btn.delete').forEach(function(btn) {
+                        btn.addEventListener('click', function(e) {
+                            e.stopPropagation();
+                            var projectId = this.dataset.id;
+                            var pill = this.closest('.project-pill');
+                            var title = pill.querySelector('.pill-title').textContent;
+
+                            if (!confirm('Supprimer ce projet ?\n\n' + title)) {
+                                return;
+                            }
+
+                            pill.classList.add('deleting');
+
+                            fetch('./projects/' + projectId, {
+                                method: 'DELETE'
+                            })
+                            .then(function(response) { return response.json(); })
+                            .then(function(result) {
+                                if (result.ok) {
+                                    setTimeout(function() {
+                                        loadProjects();
+                                    }, 300);
                                 }
                             });
                         });
@@ -2395,6 +2755,156 @@
                     console.error('Erreur chargement projets:', err);
                 });
         }
+
+        // === Modal projet ===
+        var modalProjectOverlay = document.getElementById('modal-project');
+        var modalProjectFormView = document.getElementById('modal-project-form-view');
+        var modalProjectSuccessView = document.getElementById('modal-project-success-view');
+        var projectForm = document.getElementById('project-form');
+
+        // Ouvrir le modal projet
+        document.getElementById('btn-add-project').addEventListener('click', function() {
+            modalProjectOverlay.classList.add('visible');
+            modalProjectFormView.style.display = 'block';
+            modalProjectSuccessView.style.display = 'none';
+        });
+
+        // Fermer le modal projet
+        function closeProjectModal() {
+            modalProjectOverlay.classList.remove('visible');
+            projectForm.reset();
+            document.getElementById('priority-2').checked = true;
+        }
+
+        document.getElementById('modal-project-close').addEventListener('click', closeProjectModal);
+        document.getElementById('modal-project-cancel').addEventListener('click', closeProjectModal);
+
+        modalProjectOverlay.addEventListener('click', function(e) {
+            if (e.target === modalProjectOverlay) closeProjectModal();
+        });
+
+        // Soumettre le formulaire projet
+        projectForm.addEventListener('submit', function(e) {
+            e.preventDefault();
+
+            var keywordsRaw = document.getElementById('proj-keywords').value.trim();
+            var keywords = keywordsRaw ? keywordsRaw.split(',').map(function(k) { return k.trim(); }).filter(function(k) { return k; }) : [];
+
+            var priorityEl = document.querySelector('input[name="priority"]:checked');
+            var priority = priorityEl ? parseInt(priorityEl.value) : 2;
+
+            var data = {
+                title: document.getElementById('proj-title').value.trim(),
+                category: document.getElementById('proj-category').value,
+                priority: priority,
+                keywords: keywords
+            };
+
+            fetch('./projects', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data)
+            })
+            .then(function(response) { return response.json(); })
+            .then(function(result) {
+                if (result.ok) {
+                    modalProjectFormView.style.display = 'none';
+                    modalProjectSuccessView.style.display = 'block';
+                    loadProjects();
+                    setTimeout(closeProjectModal, 1500);
+                } else {
+                    alert('Erreur : ' + (result.error || 'Impossible d\'ajouter'));
+                }
+            })
+            .catch(function(err) {
+                console.error('Erreur ajout projet:', err);
+                alert('Erreur de connexion');
+            });
+        });
+
+        // === Suggestions Claude pour projets ===
+        var suggestionsPanel = document.getElementById('suggestions-panel');
+        var suggestionsList = document.getElementById('suggestions-list');
+
+        document.getElementById('btn-claude-suggestions').addEventListener('click', function() {
+            var btn = this;
+            btn.disabled = true;
+            btn.textContent = '⏳ Chargement...';
+
+            fetch('./projects/suggestions')
+                .then(function(response) { return response.json(); })
+                .then(function(data) {
+                    if (data.error) {
+                        alert('Erreur : ' + data.error);
+                        return;
+                    }
+
+                    var suggestions = data.suggestions || [];
+                    if (suggestions.length === 0) {
+                        alert('Aucune suggestion trouvée.');
+                        return;
+                    }
+
+                    var html = '';
+                    suggestions.forEach(function(s, index) {
+                        var emoji = priorityEmoji[s.priority] || '💛';
+                        html += '<div class="suggestion-item" data-index="' + index + '">';
+                        html += '  <div class="suggestion-item-content">';
+                        html += '    <div class="suggestion-item-title">' + emoji + ' ' + escapeHtml(s.title) + '</div>';
+                        if (s.notes) {
+                            html += '    <div class="suggestion-item-notes">' + escapeHtml(s.notes) + '</div>';
+                        }
+                        html += '  </div>';
+                        html += '  <button class="btn-add-suggestion" data-suggestion=\'' + JSON.stringify(s).replace(/'/g, "&#39;") + '\'>➕ Ajouter</button>';
+                        html += '</div>';
+                    });
+
+                    suggestionsList.innerHTML = html;
+                    suggestionsPanel.classList.add('visible');
+
+                    // Ajouter les listeners
+                    suggestionsList.querySelectorAll('.btn-add-suggestion').forEach(function(addBtn) {
+                        addBtn.addEventListener('click', function() {
+                            var suggestion = JSON.parse(this.dataset.suggestion);
+                            var btnEl = this;
+                            btnEl.disabled = true;
+                            btnEl.textContent = '⏳';
+
+                            fetch('./projects', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({
+                                    title: suggestion.title,
+                                    category: suggestion.category,
+                                    priority: suggestion.priority,
+                                    keywords: suggestion.keywords || [],
+                                    notes: suggestion.notes || ''
+                                })
+                            })
+                            .then(function(response) { return response.json(); })
+                            .then(function(result) {
+                                if (result.ok) {
+                                    btnEl.textContent = '✓ Ajouté';
+                                    btnEl.style.background = 'var(--green)';
+                                    loadProjects();
+                                }
+                            });
+                        });
+                    });
+                })
+                .catch(function(err) {
+                    console.error('Erreur suggestions:', err);
+                    alert('Erreur de connexion');
+                })
+                .finally(function() {
+                    btn.disabled = false;
+                    btn.textContent = '💡 Suggestions Claude';
+                });
+        });
+
+        document.getElementById('btn-close-suggestions').addEventListener('click', function() {
+            suggestionsPanel.classList.remove('visible');
+        });
 
         // === Mémoires (il y a un an) ===
         function loadMemories() {

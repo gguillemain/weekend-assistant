@@ -768,6 +768,22 @@ def get_projects_for_prompt() -> str:
     return "\n".join(lines)
 
 
+def delete_project(project_id: int) -> None:
+    """
+    Supprime un projet de la base.
+
+    Args:
+        project_id: ID du projet à supprimer
+    """
+    conn = get_connection()
+    cursor = conn.cursor()
+
+    cursor.execute("DELETE FROM life_projects WHERE id = ?", (project_id,))
+
+    conn.commit()
+    conn.close()
+
+
 # ============================================================
 # Mémoires (il y a un an)
 # ============================================================
