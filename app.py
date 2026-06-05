@@ -31,6 +31,16 @@ def format_month_filter(date_str):
     elif hasattr(date_str, 'day') and hasattr(date_str, 'month'):
         return f"{date_str.day} {mois[date_str.month - 1]}"
     return str(date_str)
+
+
+@app.template_filter('format_date_short')
+def format_date_short_filter(d):
+    """Formate une date en 'jour mois' court."""
+    mois = ['jan', 'fév', 'mars', 'avr', 'mai', 'juin',
+            'juil', 'août', 'sept', 'oct', 'nov', 'déc']
+    if hasattr(d, 'day') and hasattr(d, 'month'):
+        return f"{d.day} {mois[d.month - 1]}"
+    return str(d)
 app.secret_key = config.FLASK_SECRET_KEY
 
 # Scheduler pour l'envoi d'email hebdomadaire
@@ -94,6 +104,8 @@ def prepare_movies_for_template(movies: list) -> list:
 @app.route("/")
 def index():
     """Page principale avec les suggestions."""
+    import calendar as cal_module
+
     result = suggest.get_suggestions_for_next_period()
 
     # Calculer les données vacances pour la section voyages
@@ -104,6 +116,36 @@ def index():
     next_vacation = vacations[0] if vacations else None
     days_until_vacation = (next_vacation["start"] - today).days if next_vacation else 999
     is_vacation_soon = days_until_vacation <= 21
+
+    # Calendrier mensuel
+    mois_fr = ['janvier', 'février', 'mars', 'avril', 'mai', 'juin',
+               'juillet', 'août', 'septembre', 'octobre', 'novembre', 'décembre']
+    month_name = f"{mois_fr[today.month - 1]} {today.year}"
+    cal_weeks = cal_module.monthcalendar(today.year, today.month)
+    today_day = today.day
+
+    # Jours week-end et vacances du mois courant
+    weekend_days = set()
+    vacation_days = set()
+    for p in periods:
+        p_start = p.get("start")
+        p_end = p.get("end")
+        if not p_start or not p_end:
+            continue
+        # Vérifier si la période touche le mois en cours
+        if p_start.month == today.month or p_end.month == today.month:
+            p_type = p.get("type", "")
+            # Calculer les jours dans le mois courant
+            start_day = p_start.day if p_start.month == today.month else 1
+            end_day = p_end.day if p_end.month == today.month else 31
+            for d in range(start_day, min(end_day + 1, 32)):
+                if p_type in ["weekend", "bridge"]:
+                    weekend_days.add(d)
+                elif p_type == "vacation":
+                    vacation_days.add(d)
+
+    # Projets actifs pour sidebar
+    active_projects = profile.get_active_projects()
 
     # Données voyage (sans appel API lourd sur la page d'accueil)
     # Les données complètes sont générées via /test-travel ou en mode vacances
@@ -162,6 +204,7 @@ def index():
                                suggestions=[],
                                intro="",
                                movies=[],
+                               florival_movies=[],
                                hikes=[],
                                show_hiking=False,
                                restaurants=[],
@@ -175,6 +218,12 @@ def index():
                                travel_citybreaks=travel_citybreaks,
                                travel_roadtrips=travel_roadtrips,
                                upcoming_vacations=upcoming_vacations,
+                               month_name=month_name,
+                               cal_weeks=cal_weeks,
+                               today_day=today_day,
+                               weekend_days=weekend_days,
+                               vacation_days=vacation_days,
+                               active_projects=active_projects,
                                generated_at=result.get("generated_at"))
 
     # Suggestions structurées (déjà parsées depuis JSON)
@@ -184,8 +233,14 @@ def index():
 
     # Préparer les films (seulement en mode week-end)
     movies = []
+    florival_movies = []
     if not is_vacation:
         movies = prepare_movies_for_template(result.get("movies", []))
+        # Filtrer les films du Florival uniquement
+        florival_movies = [
+            m for m in movies
+            if "florival" in m.get("cinemas_display", "").lower()
+        ]
 
     # Vérifier si on affiche les randonnées (au moins un jour favorable)
     weather_data = result.get("weather", {})
@@ -202,6 +257,7 @@ def index():
                            suggestions=suggestions,
                            intro=intro,
                            movies=movies,
+                           florival_movies=florival_movies,
                            hikes=result.get("hikes", [])[:3],
                            show_hiking=show_hiking,
                            restaurants=result.get("restaurants", [])[:3],
@@ -215,6 +271,12 @@ def index():
                            travel_citybreaks=travel_citybreaks,
                            travel_roadtrips=travel_roadtrips,
                            upcoming_vacations=upcoming_vacations,
+                           month_name=month_name,
+                           cal_weeks=cal_weeks,
+                           today_day=today_day,
+                           weekend_days=weekend_days,
+                           vacation_days=vacation_days,
+                           active_projects=active_projects,
                            generated_at=result["generated_at"])
 
 

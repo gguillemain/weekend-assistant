@@ -16,6 +16,8 @@
             --gray: #888;
             --red: #D64545;
             --green: #4CAF50;
+            --border-radius-md: 8px;
+            --border-radius-lg: 12px;
         }
 
         * {
@@ -32,24 +34,64 @@
             padding-bottom: 3rem;
         }
 
+        /* Dashboard Layout */
+        .dashboard {
+            max-width: 1100px;
+            margin: 0 auto;
+            padding: 1rem 1rem 3rem;
+        }
+
+        .dashboard-header {
+            background: var(--sage);
+            color: var(--white);
+            padding: 1.25rem 1.5rem;
+            margin-bottom: 1.5rem;
+            border-radius: var(--border-radius-lg);
+        }
+
+        .dashboard-header h1 {
+            font-size: 1.5rem;
+            font-weight: 600;
+            margin-bottom: 0.25rem;
+        }
+
+        .dashboard-header .period-label {
+            font-size: 1rem;
+            opacity: 0.9;
+        }
+
+        .dashboard-body {
+            display: grid;
+            grid-template-columns: 1fr 240px;
+            gap: 1.5rem;
+            align-items: start;
+        }
+
+        .col-main {
+            min-width: 0;
+        }
+
+        .col-sidebar {
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+        }
+
+        /* Mobile : une colonne */
+        @media (max-width: 700px) {
+            .dashboard-body {
+                grid-template-columns: 1fr;
+            }
+            .col-sidebar {
+                order: -1;
+            }
+        }
+
+        /* Legacy container */
         .container {
             max-width: 900px;
             margin: 0 auto;
             padding: 0 1rem;
-        }
-
-        /* Header */
-        header {
-            background: var(--sage);
-            color: var(--white);
-            padding: 1.5rem 0;
-            margin-bottom: 2rem;
-        }
-
-        header h1 {
-            font-size: 1.8rem;
-            font-weight: 600;
-            margin-bottom: 0.25rem;
         }
 
         .period-label {
@@ -1477,11 +1519,320 @@
         .memories-strip .memory-icon {
             margin-right: 8px;
         }
+
+        /* ========================================
+           SIDEBAR COMPONENTS
+           ======================================== */
+
+        .sidebar-card {
+            background: var(--white);
+            border-radius: var(--border-radius-md);
+            padding: 12px;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.05);
+        }
+
+        .section-title-sm {
+            font-size: 0.85rem;
+            font-weight: 600;
+            color: var(--anthracite);
+            margin-bottom: 10px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .see-all {
+            font-size: 11px;
+            color: var(--gray);
+            text-decoration: none;
+        }
+
+        .see-all:hover {
+            color: var(--sage);
+        }
+
+        /* Mini calendrier */
+        .mini-cal {
+            background: var(--white);
+            border-radius: var(--border-radius-md);
+            padding: 12px;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.05);
+        }
+
+        .cal-header {
+            text-align: center;
+            font-size: 0.85rem;
+            font-weight: 600;
+            color: var(--anthracite);
+            margin-bottom: 8px;
+            text-transform: capitalize;
+        }
+
+        .cal-grid {
+            display: grid;
+            grid-template-columns: repeat(7, 1fr);
+            gap: 2px;
+        }
+
+        .cal-day-header {
+            font-size: 9px;
+            color: var(--gray);
+            text-align: center;
+            padding: 2px;
+        }
+
+        .cal-day {
+            font-size: 10px;
+            text-align: center;
+            padding: 3px 2px;
+            border-radius: 3px;
+        }
+
+        .cal-day.empty {
+            visibility: hidden;
+        }
+
+        .cal-day.today {
+            font-weight: 600;
+            border: 1px solid var(--sage);
+        }
+
+        .cal-day.weekend {
+            background: #e8f5e9;
+            color: #2e7d32;
+        }
+
+        .cal-day.vacation {
+            background: var(--sage);
+            color: var(--white);
+        }
+
+        .cal-legend {
+            display: flex;
+            gap: 10px;
+            margin-top: 8px;
+            font-size: 9px;
+            color: var(--gray);
+        }
+
+        .legend-weekend::before {
+            content: "■";
+            color: #e8f5e9;
+            margin-right: 3px;
+        }
+
+        .legend-vacation::before {
+            content: "■";
+            color: var(--sage);
+            margin-right: 3px;
+        }
+
+        /* Liste vacances sidebar */
+        .vacation-list {
+            background: var(--white);
+            border-radius: var(--border-radius-md);
+            padding: 12px;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.05);
+        }
+
+        .vacation-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 6px 8px;
+            border-bottom: 0.5px solid var(--gray-light);
+        }
+
+        .vacation-row:last-child {
+            border-bottom: none;
+        }
+
+        .vacation-row.vacation-next {
+            background: var(--sage);
+            color: var(--white);
+            border-radius: var(--border-radius-md);
+            margin-bottom: 4px;
+            border-bottom: none;
+        }
+
+        .vacation-row.vacation-next .vacation-dates {
+            color: rgba(255,255,255,0.85);
+        }
+
+        .vacation-name {
+            font-size: 12px;
+            font-weight: 500;
+        }
+
+        .vacation-dates {
+            font-size: 10px;
+            color: var(--gray);
+        }
+
+        .vacation-days {
+            font-size: 11px;
+            font-weight: 500;
+            color: var(--sage);
+        }
+
+        .vacation-row.vacation-next .vacation-days {
+            color: var(--white);
+        }
+
+        /* Projets sidebar résumé */
+        .projects-summary {
+            background: var(--white);
+            border-radius: var(--border-radius-md);
+            padding: 12px;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.05);
+        }
+
+        .project-row {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 12px;
+            padding: 4px 0;
+            border-bottom: 0.5px solid var(--gray-light);
+        }
+
+        .project-row:last-child {
+            border-bottom: none;
+        }
+
+        .project-priority {
+            font-size: 11px;
+        }
+
+        .project-row .project-title {
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        /* ========================================
+           FLORIVAL FILMS LIST
+           ======================================== */
+
+        .florival-list {
+            margin-bottom: 1.5rem;
+        }
+
+        .film-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 8px 12px;
+            background: var(--white);
+            border-radius: var(--border-radius-md);
+            border: 0.5px solid var(--gray-light);
+            margin-bottom: 6px;
+        }
+
+        .film-info {
+            display: flex;
+            align-items: baseline;
+            gap: 6px;
+            min-width: 0;
+            flex: 1;
+        }
+
+        .film-row .film-title {
+            font-size: 13px;
+            font-weight: 500;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .film-row .film-director {
+            font-size: 11px;
+            color: var(--gray);
+            white-space: nowrap;
+        }
+
+        .film-badges {
+            display: flex;
+            gap: 6px;
+            flex-shrink: 0;
+        }
+
+        .badge-telerama {
+            background: #e3f2fd;
+            color: #1565c0;
+            font-size: 11px;
+            padding: 2px 8px;
+            border-radius: 20px;
+        }
+
+        .badge-note {
+            background: var(--gray-light);
+            color: var(--gray);
+            font-size: 11px;
+            padding: 2px 8px;
+            border-radius: 20px;
+        }
+
+        /* ========================================
+           FLIGHTS LIST
+           ======================================== */
+
+        .flights-list {
+            margin-bottom: 1.5rem;
+        }
+
+        .flight-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 8px 12px;
+            background: var(--white);
+            border-radius: var(--border-radius-md);
+            border: 0.5px solid var(--gray-light);
+            margin-bottom: 6px;
+        }
+
+        .flight-info {
+            min-width: 0;
+        }
+
+        .flight-dest {
+            font-size: 13px;
+            font-weight: 500;
+        }
+
+        .flight-detail {
+            font-size: 11px;
+            color: var(--gray);
+            display: block;
+        }
+
+        .flight-price {
+            font-size: 16px;
+            font-weight: 500;
+            color: var(--sage);
+            flex-shrink: 0;
+        }
+
+        .flight-ar {
+            font-size: 10px;
+            color: var(--gray);
+            margin-left: 2px;
+        }
+
+        .empty-state {
+            font-size: 12px;
+            color: var(--gray);
+            font-style: italic;
+            padding: 8px 12px;
+            text-align: center;
+        }
     </style>
 </head>
 <body{% if is_vacation %} class="vacation-mode"{% endif %}>
-    <header>
-        <div class="container">
+    <div class="dashboard">
+        <!-- Dashboard Header -->
+        <header class="dashboard-header">
             <h1>Weekend Assistant</h1>
             <p class="period-label">{{ period.label }} · {{ period.start.strftime('%d') }} au {{ period.end.strftime('%d %B %Y') }}</p>
 
@@ -1496,15 +1847,17 @@
                 {% endfor %}
             </div>
             {% endif %}
-        </div>
-    </header>
+        </header>
 
-    <main class="container">
-        <!-- Tabs Navigation -->
-        <div class="tabs">
-            <button class="tab-button active" data-tab="suggestions">Suggestions</button>
-            <button class="tab-button" data-tab="history">Historique</button>
-        </div>
+        <!-- Dashboard Body : deux colonnes -->
+        <div class="dashboard-body">
+            <!-- Colonne principale -->
+            <div class="col-main">
+                <!-- Tabs Navigation -->
+                <div class="tabs">
+                    <button class="tab-button active" data-tab="suggestions">Suggestions</button>
+                    <button class="tab-button" data-tab="history">Historique</button>
+                </div>
 
         <!-- Tab Content: Suggestions -->
         <div class="tab-content active" id="tab-suggestions">
@@ -1553,36 +1906,27 @@
             {% endif %}
         </div>
 
-        <!-- Films (masqué en mode vacances) -->
-        {% if not is_vacation %}
-        <h2 class="section-title">Films à l'affiche</h2>
-
-        {% if movies %}
-        <div class="films-grid">
-            {% for movie in movies %}
-            <article class="film-card">
-                <h4>{{ movie.title }}</h4>
-                <p class="director">{{ movie.director or 'Réalisateur inconnu' }}</p>
-                <p class="film-meta">
-                    {% if movie.telerama_pick %}
-                    <span class="telerama">★ Télérama</span> ·
+        <!-- Films Florival (masqué en mode vacances) -->
+        {% if not is_vacation and florival_movies %}
+        <div class="florival-list">
+            <div class="section-title-sm">🎬 Le Florival — à l'affiche</div>
+            {% for film in florival_movies %}
+            <div class="film-row">
+                <div class="film-info">
+                    <span class="film-title">{{ film.title }}</span>
+                    <span class="film-director">{{ film.director or '' }}</span>
+                </div>
+                <div class="film-badges">
+                    {% if film.telerama_pick %}
+                    <span class="badge-telerama">★ Télérama</span>
                     {% endif %}
-                    {% if movie.press_rating %}
-                    Note : {{ "%.1f"|format(movie.press_rating) }}/5
-                    {% else %}
-                    Note : N/A
+                    {% if film.press_rating %}
+                    <span class="badge-note">{{ "%.1f"|format(film.press_rating) }}/5</span>
                     {% endif %}
-                </p>
-                <p class="cinemas">{{ movie.cinemas_display }}</p>
-                {% if movie.allocine_url %}
-                <a href="{{ movie.allocine_url }}" target="_blank">Voir sur Allocine →</a>
-                {% endif %}
-            </article>
+                </div>
+            </div>
             {% endfor %}
         </div>
-        {% else %}
-        <p class="no-data">Aucun film Art & Essai trouvé pour cette période.</p>
-        {% endif %}
         {% endif %}
 
         <!-- Randonnées -->
@@ -1654,25 +1998,25 @@
         </div>
         {% endif %}
 
-        {% if cheap_flights %}
-        <!-- Ticker bons plans vols -->
-        <div class="flights-ticker">
-            <div class="ticker-label">✈️ Bons plans depuis Basel-Mulhouse</div>
-            <div class="ticker-content">
-                {% for flight in cheap_flights %}
-                <span class="ticker-item">
-                    <strong>{{ flight.airline }}</strong>
-                    BSL → {{ flight.destination }}
-                    <strong>{{ flight.price_flight|int }}€</strong> A/R
-                    · {{ flight.outbound_date|format_month }}
-                </span>
-                {% if not loop.last %}
-                <span class="ticker-sep">·</span>
-                {% endif %}
-                {% endfor %}
+        <!-- Bons plans vols -->
+        <div class="flights-list">
+            <div class="section-title-sm">✈️ Vols depuis Basel-Mulhouse</div>
+            {% if cheap_flights %}
+            {% for flight in cheap_flights %}
+            <div class="flight-row">
+                <div class="flight-info">
+                    <span class="flight-dest">BSL → {{ flight.destination }}</span>
+                    <span class="flight-detail">{{ flight.airline }} · {{ flight.outbound_date|format_month }}</span>
+                </div>
+                <div class="flight-price">
+                    {{ flight.price_flight|int }}€<span class="flight-ar">A/R</span>
+                </div>
             </div>
+            {% endfor %}
+            {% else %}
+            <div class="empty-state">Aucun vol &lt; 150€ détecté cette semaine</div>
+            {% endif %}
         </div>
-        {% endif %}
 
         {% if travel_citybreaks %}
         <!-- Grille destinations avion -->
@@ -1931,7 +2275,71 @@
                 <div class="no-history">Chargement...</div>
             </div>
         </div>
-    </main>
+            </div><!-- /col-main -->
+
+            <!-- Colonne sidebar -->
+            <div class="col-sidebar">
+                <!-- Mini calendrier -->
+                <div class="mini-cal">
+                    <div class="cal-header">{{ month_name }}</div>
+                    <div class="cal-grid">
+                        <div class="cal-day-header">L</div>
+                        <div class="cal-day-header">M</div>
+                        <div class="cal-day-header">M</div>
+                        <div class="cal-day-header">J</div>
+                        <div class="cal-day-header">V</div>
+                        <div class="cal-day-header">S</div>
+                        <div class="cal-day-header">D</div>
+                        {% for week in cal_weeks %}
+                            {% for day in week %}
+                            <div class="cal-day{% if day == 0 %} empty{% endif %}{% if day == today_day %} today{% endif %}{% if day in weekend_days %} weekend{% endif %}{% if day in vacation_days %} vacation{% endif %}">
+                                {% if day != 0 %}{{ day }}{% endif %}
+                            </div>
+                            {% endfor %}
+                        {% endfor %}
+                    </div>
+                    <div class="cal-legend">
+                        <span class="legend-weekend">Week-end</span>
+                        <span class="legend-vacation">Vacances</span>
+                    </div>
+                </div>
+
+                <!-- Prochaines vacances -->
+                {% if upcoming_vacations %}
+                <div class="vacation-list">
+                    <div class="section-title-sm">Prochaines vacances</div>
+                    {% for v in upcoming_vacations %}
+                    <div class="vacation-row{% if loop.first %} vacation-next{% endif %}">
+                        <div>
+                            <div class="vacation-name">{{ v.label }}</div>
+                            <div class="vacation-dates">{{ v.start|format_date_short }} → {{ v.end|format_date_short }}</div>
+                        </div>
+                        <div class="vacation-days">{{ v.days }}j</div>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% endif %}
+
+                <!-- Projets en cours (résumé) -->
+                {% if active_projects %}
+                <div class="projects-summary">
+                    <div class="section-title-sm">
+                        Projets
+                        <a href="#projects-section" class="see-all">voir tout</a>
+                    </div>
+                    {% for p in active_projects[:4] %}
+                    <div class="project-row">
+                        <span class="project-priority">
+                            {% if p.priority == 3 %}🔥{% elif p.priority == 2 %}💛{% else %}⭐{% endif %}
+                        </span>
+                        <span class="project-title">{{ p.title }}</span>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% endif %}
+            </div><!-- /col-sidebar -->
+        </div><!-- /dashboard-body -->
+    </div><!-- /dashboard -->
 
     <!-- Bouton flottant recommandation -->
     <button class="fab-recommendation" id="fab-recommendation" title="Ajouter une recommandation">➕</button>
