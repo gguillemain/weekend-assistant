@@ -105,20 +105,51 @@ def index():
     days_until_vacation = (next_vacation["start"] - today).days if next_vacation else 999
     is_vacation_soon = days_until_vacation <= 21
 
-    # Générer les suggestions voyage si vacances à venir
+    # Données voyage (sans appel API lourd sur la page d'accueil)
+    # Les données complètes sont générées via /test-travel ou en mode vacances
     cheap_flights = []
     travel_citybreaks = []
     travel_roadtrips = []
 
+    # On récupère uniquement les données statiques pour l'affichage
+    # sans déclencher les appels API Ryanair/EasyJet/Claude
     if next_vacation and days_until_vacation <= 90:
         try:
+            from collectors.travel_citybreaks import get_citybreaks, CITY_BREAKS
+            from collectors.travel_roadtrips import get_roadtrips, ROAD_TRIPS
+
             user_profile = profile.get_profile()
-            travel_data = generate_travel_suggestions(next_vacation, user_profile)
-            cheap_flights = travel_data.get("flights", [])[:5]
-            travel_citybreaks = travel_data.get("citybreaks_top", [])[:3]
-            travel_roadtrips = travel_data.get("roadtrips_top", [])[:3]
+
+            # City-breaks statiques (top 3 par score saison)
+            travel_citybreaks = [
+                {
+                    "destination": c["destination"],
+                    "country": c["country"],
+                    "duration_days": c.get("duration_days", [4, 5]),
+                    "highlights": c.get("highlights", [])[:4],
+                    "budget": c.get("budget", "€€"),
+                    "geraldine_loves": c.get("geraldine_loves", False),
+                    "flight_info": None,
+                    "travel_score": 0.5,
+                }
+                for c in CITY_BREAKS[:3]
+            ]
+
+            # Roadtrips statiques (top 3)
+            travel_roadtrips = [
+                {
+                    "destination": r["destination"],
+                    "country": r["country"],
+                    "drive_hours": r["drive_hours"],
+                    "duration_days": r.get("duration_days", [3, 4]),
+                    "highlights": r.get("highlights", [])[:4],
+                    "best_season": r.get("seasons", ["été"])[0] if r.get("seasons") and r.get("seasons") != ["all"] else "toute saison",
+                    "travel_score": 0.5,
+                }
+                for r in ROAD_TRIPS[:3]
+            ]
         except Exception as e:
-            print(f"  ⚠ Erreur génération voyages : {e}")
+            print(f"  ⚠ Erreur données voyages : {e}")
 
     # Calendrier des 4 prochaines vacances
     upcoming_vacations = vacations[:4]
