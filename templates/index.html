@@ -950,6 +950,239 @@
             background: var(--sage);
             color: var(--white);
         }
+
+        /* ========================================
+           SECTION VOYAGES
+           ======================================== */
+
+        /* Bandeau vacances countdown */
+        .vacation-banner {
+            background: #f8f9fa;
+            border: 0.5px solid var(--gray-light);
+            border-radius: 12px;
+            padding: 14px 18px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 1.5rem;
+        }
+
+        .vacation-banner-left {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .vacation-banner-icon {
+            font-size: 1.5rem;
+        }
+
+        .vacation-banner-label {
+            font-weight: 500;
+            color: var(--anthracite);
+        }
+
+        .vacation-banner-countdown {
+            text-align: center;
+        }
+
+        .vacation-banner-countdown .days {
+            font-size: 22px;
+            font-weight: 500;
+            color: var(--sage);
+        }
+
+        .vacation-banner-countdown .label {
+            font-size: 11px;
+            color: var(--gray);
+        }
+
+        .badge-duration {
+            background: #e3f2fd;
+            color: #1565c0;
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-size: 0.85rem;
+            font-weight: 500;
+        }
+
+        /* Ticker vols */
+        .flights-ticker {
+            background: var(--white);
+            border-radius: 10px;
+            padding: 12px 16px;
+            margin-bottom: 1.5rem;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.05);
+        }
+
+        .ticker-label {
+            font-size: 0.85rem;
+            font-weight: 600;
+            color: var(--anthracite);
+            margin-bottom: 8px;
+        }
+
+        .ticker-content {
+            display: flex;
+            gap: 24px;
+            flex-wrap: wrap;
+            font-size: 13px;
+            color: #555;
+        }
+
+        .ticker-item strong {
+            color: var(--sage);
+        }
+
+        .ticker-sep {
+            color: var(--gray-light);
+        }
+
+        /* Grilles destinations */
+        .travel-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+            gap: 1rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .travel-card {
+            background: var(--white);
+            border-radius: 12px;
+            padding: 1.25rem;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+            position: relative;
+            border: 2px solid transparent;
+            transition: border-color 0.2s;
+        }
+
+        .travel-card:hover {
+            border-color: var(--gray-light);
+        }
+
+        .travel-card.recommended {
+            border: 2px solid var(--sage);
+        }
+
+        .travel-card .badge-recommended {
+            position: absolute;
+            top: -8px;
+            left: 12px;
+            background: var(--sage);
+            color: var(--white);
+            font-size: 0.7rem;
+            padding: 3px 8px;
+            border-radius: 10px;
+            font-weight: 500;
+        }
+
+        .travel-card .flag {
+            font-size: 28px;
+            margin-bottom: 8px;
+        }
+
+        .travel-card .destination {
+            font-size: 1.1rem;
+            font-weight: 500;
+            color: var(--anthracite);
+            margin-bottom: 4px;
+        }
+
+        .travel-card .subtitle {
+            font-size: 0.85rem;
+            color: var(--gray);
+            margin-bottom: 10px;
+        }
+
+        .travel-card .badges {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+            margin-bottom: 10px;
+        }
+
+        .badge-price-flight {
+            background: #e8f5e9;
+            color: #2e7d32;
+            padding: 4px 10px;
+            border-radius: 12px;
+            font-size: 0.8rem;
+            font-weight: 500;
+        }
+
+        .badge-budget {
+            background: var(--gray-light);
+            color: var(--gray);
+            padding: 4px 10px;
+            border-radius: 12px;
+            font-size: 0.8rem;
+        }
+
+        .badge-drive {
+            background: #fff3e0;
+            color: #e65100;
+            padding: 4px 10px;
+            border-radius: 12px;
+            font-size: 0.8rem;
+            font-weight: 500;
+        }
+
+        .badge-season-ete {
+            background: #e8f5e9;
+            color: #2e7d32;
+        }
+
+        .badge-season-hiver {
+            background: #e3f2fd;
+            color: #1565c0;
+        }
+
+        .badge-season-printemps {
+            background: #fff8e1;
+            color: #f57f17;
+        }
+
+        .badge-season-automne {
+            background: #fff3e0;
+            color: #e65100;
+        }
+
+        .travel-card .highlights {
+            font-size: 0.85rem;
+            color: #555;
+            margin-bottom: 10px;
+        }
+
+        .travel-card .cta {
+            font-size: 0.8rem;
+            color: var(--sage);
+            font-weight: 500;
+            border-top: 1px solid var(--gray-light);
+            padding-top: 10px;
+            margin-top: 10px;
+        }
+
+        /* Calendrier vacances */
+        .vacation-calendar-strip {
+            display: flex;
+            gap: 12px;
+            flex-wrap: wrap;
+            align-items: center;
+            font-size: 12px;
+            color: var(--gray);
+            padding: 12px 16px;
+            background: #f5f5f5;
+            border-radius: 8px;
+            margin-top: 1.5rem;
+        }
+
+        .vacation-calendar-strip strong {
+            color: var(--anthracite);
+        }
+
+        .vacation-calendar-strip .sep {
+            color: var(--gray-light);
+        }
     </style>
 </head>
 <body{% if is_vacation %} class="vacation-mode"{% endif %}>
@@ -1104,6 +1337,143 @@
                 <a href="{{ resto.url }}" target="_blank">Voir sur Google Maps →</a>
                 {% endif %}
             </article>
+            {% endfor %}
+        </div>
+        {% endif %}
+
+        <!-- ========================================
+             SECTION VOYAGES
+             ======================================== -->
+
+        {% if is_vacation_soon and next_vacation %}
+        <!-- Bandeau vacances countdown -->
+        <div class="vacation-banner" id="vacation-banner">
+            <div class="vacation-banner-left">
+                <span class="vacation-banner-icon">✈️</span>
+                <span class="vacation-banner-label">{{ next_vacation.label }}</span>
+            </div>
+            <div class="vacation-banner-countdown">
+                <div class="days">J-{{ days_until_vacation }}</div>
+                <div class="label">jours</div>
+            </div>
+            <span class="badge-duration">{{ next_vacation.days }} jours de liberté</span>
+        </div>
+        {% endif %}
+
+        {% if cheap_flights %}
+        <!-- Ticker bons plans vols -->
+        <div class="flights-ticker">
+            <div class="ticker-label">✈️ Bons plans depuis Basel-Mulhouse</div>
+            <div class="ticker-content">
+                {% for flight in cheap_flights %}
+                <span class="ticker-item">
+                    <strong>{{ flight.airline }}</strong>
+                    BSL → {{ flight.destination }}
+                    <strong>{{ flight.price_flight|int }}€</strong> A/R
+                    · {{ flight.outbound_date|format_month }}
+                </span>
+                {% if not loop.last %}
+                <span class="ticker-sep">·</span>
+                {% endif %}
+                {% endfor %}
+            </div>
+        </div>
+        {% endif %}
+
+        {% if travel_citybreaks %}
+        <!-- Grille destinations avion -->
+        <h2 class="section-title">
+            {% if next_vacation %}
+            Suggestions pour {{ next_vacation.label }}
+            {% else %}
+            Prochaines destinations
+            {% endif %}
+        </h2>
+
+        <div class="travel-grid">
+            {% for city in travel_citybreaks %}
+            <article class="travel-card{% if loop.first %} recommended{% endif %}">
+                {% if loop.first %}
+                <span class="badge-recommended">Recommandé</span>
+                {% endif %}
+                <div class="flag">
+                    {% if city.country == "Royaume-Uni" %}🇬🇧
+                    {% elif city.country == "Irlande" %}🇮🇪
+                    {% elif city.country == "Écosse" %}🏴󠁧󠁢󠁳󠁣󠁴󠁿
+                    {% elif city.country == "Portugal" %}🇵🇹
+                    {% elif city.country == "Espagne" %}🇪🇸
+                    {% elif city.country == "Italie" %}🇮🇹
+                    {% elif city.country == "Allemagne" %}🇩🇪
+                    {% elif city.country == "Autriche" %}🇦🇹
+                    {% elif city.country == "Suisse" %}🇨🇭
+                    {% elif city.country == "Pays-Bas" %}🇳🇱
+                    {% elif city.country == "Belgique" %}🇧🇪
+                    {% elif city.country == "Tchéquie" %}🇨🇿
+                    {% elif city.country == "Hongrie" %}🇭🇺
+                    {% elif city.country == "Pologne" %}🇵🇱
+                    {% elif city.country == "Danemark" %}🇩🇰
+                    {% elif city.country == "Grèce" %}🇬🇷
+                    {% elif city.country == "France" %}🇫🇷
+                    {% else %}🌍
+                    {% endif %}
+                </div>
+                <div class="destination">{{ city.destination }}</div>
+                <div class="subtitle">{{ city.country }} · {{ city.duration_days[0] }}-{{ city.duration_days[1] }} jours</div>
+                <div class="badges">
+                    {% if city.flight_info %}
+                    <span class="badge-price-flight">{{ city.flight_info.price|int }}€ vol</span>
+                    <span class="badge-budget">~{{ city.flight_info.total_estimate|int }}€/2p</span>
+                    {% else %}
+                    <span class="badge-budget">{{ city.budget }}</span>
+                    {% endif %}
+                </div>
+                <div class="highlights">{{ city.highlights|join(', ') }}</div>
+                {% if city.geraldine_loves %}
+                <div class="cta">💚 Géraldine adore →</div>
+                {% endif %}
+            </article>
+            {% endfor %}
+        </div>
+        {% endif %}
+
+        {% if travel_roadtrips %}
+        <!-- Grille roadtrips voiture -->
+        <h2 class="section-title">Roadtrips voiture</h2>
+
+        <div class="travel-grid">
+            {% for trip in travel_roadtrips %}
+            <article class="travel-card{% if loop.first %} recommended{% endif %}">
+                {% if loop.first %}
+                <span class="badge-recommended">Recommandé</span>
+                {% endif %}
+                <div class="flag">🚗</div>
+                <div class="destination">{{ trip.destination }}</div>
+                <div class="subtitle">{{ trip.country }} · {{ trip.duration_days[0] }}-{{ trip.duration_days[1] }} jours</div>
+                <div class="badges">
+                    <span class="badge-drive">{{ trip.drive_hours }}h de route</span>
+                    {% set season = trip.best_season|lower|replace(' ', '-') %}
+                    {% if season == 'toute-saison' %}
+                    <span class="badge-budget">{{ trip.best_season }}</span>
+                    {% else %}
+                    <span class="badge-budget badge-season-{{ season }}">{{ trip.best_season }}</span>
+                    {% endif %}
+                </div>
+                <div class="highlights">{{ trip.highlights|join(', ') }}</div>
+            </article>
+            {% endfor %}
+        </div>
+        {% endif %}
+
+        {% if upcoming_vacations %}
+        <!-- Calendrier vacances -->
+        <div class="vacation-calendar-strip">
+            <span>📅</span>
+            <strong>Calendrier :</strong>
+            {% for vac in upcoming_vacations %}
+            <span>{{ vac.label }} {{ vac.start.strftime('%d') }}-{{ vac.end.strftime('%d %b') }} ({{ vac.days }}j)</span>
+            {% if not loop.last %}
+            <span class="sep">·</span>
+            {% endif %}
             {% endfor %}
         </div>
         {% endif %}

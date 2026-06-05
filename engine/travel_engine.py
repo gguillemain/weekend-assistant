@@ -547,6 +547,8 @@ def generate_travel_suggestions(
         "vacation_period": vacation_period,
         "flights_found": len(flights),
         "deals_found": len(deals),
+        # Vols bruts pour le ticker (top 5 par budget_score)
+        "flights": sorted(flights, key=lambda f: -f.get("budget_score", 0))[:5],
         "citybreaks_top": [
             {
                 "destination": c["destination"],
@@ -555,6 +557,10 @@ def generate_travel_suggestions(
                 "availability_score": c.get("availability_score", 0),
                 "geraldine_loves": c.get("geraldine_loves", False),
                 "flight_info": c.get("flight_info"),
+                "duration_days": c.get("duration_days", [4, 5]),
+                "highlights": c.get("highlights", []),
+                "budget": c.get("budget", "€€"),
+                "seasons": c.get("seasons", ["all"]),
             }
             for c in citybreaks[:5]
         ],
@@ -565,6 +571,9 @@ def generate_travel_suggestions(
                 "drive_hours": r["drive_hours"],
                 "travel_score": r["travel_score"],
                 "availability_score": r.get("availability_score", 0),
+                "duration_days": r.get("duration_days", [3, 4]),
+                "highlights": r.get("highlights", []),
+                "best_season": r.get("seasons", ["été"])[0] if r.get("seasons") and r.get("seasons") != ["all"] else "toute saison",
             }
             for r in roadtrips[:5]
         ],

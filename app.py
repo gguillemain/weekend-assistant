@@ -1,16 +1,36 @@
 from flask import Flask, render_template, Response, request, jsonify
 import json
 import atexit
+from datetime import date
 import config
 from engine import calendar_engine
 from engine import suggest
 from engine import email_sender
 from engine import profile
+from engine.travel_engine import generate_travel_suggestions
 from engine.cache import cache_stats, cache_clear_all, cache_clear_expired
 from collectors import weather, cinema, events, hiking
 from apscheduler.schedulers.background import BackgroundScheduler
 
 app = Flask(__name__)
+
+
+# Filtre Jinja2 pour formater les dates
+@app.template_filter('format_month')
+def format_month_filter(date_str):
+    """Formate une date en 'jour mois' français."""
+    mois = ['jan', 'fév', 'mars', 'avr', 'mai', 'juin',
+            'juil', 'août', 'sept', 'oct', 'nov', 'déc']
+    if isinstance(date_str, str):
+        # Format YYYY-MM-DD
+        parts = date_str.split('-')
+        if len(parts) == 3:
+            day = int(parts[2])
+            month = int(parts[1])
+            return f"{day} {mois[month - 1]}"
+    elif hasattr(date_str, 'day') and hasattr(date_str, 'month'):
+        return f"{date_str.day} {mois[date_str.month - 1]}"
+    return str(date_str)
 app.secret_key = config.FLASK_SECRET_KEY
 
 # Scheduler pour l'envoi d'email hebdomadaire
@@ -76,6 +96,33 @@ def index():
     """Page principale avec les suggestions."""
     result = suggest.get_suggestions_for_next_period()
 
+    # Calculer les données vacances pour la section voyages
+    today = date.today()
+    periods = calendar_engine.get_next_periods(limit=10)
+    vacations = [p for p in periods if p.get("type") == "vacation" or p.get("mode") == "vacances"]
+
+    next_vacation = vacations[0] if vacations else None
+    days_until_vacation = (next_vacation["start"] - today).days if next_vacation else 999
+    is_vacation_soon = days_until_vacation <= 21
+
+    # Générer les suggestions voyage si vacances à venir
+    cheap_flights = []
+    travel_citybreaks = []
+    travel_roadtrips = []
+
+    if next_vacation and days_until_vacation <= 90:
+        try:
+            user_profile = profile.get_profile()
+            travel_data = generate_travel_suggestions(next_vacation, user_profile)
+            cheap_flights = travel_data.get("flights", [])[:5]
+            travel_citybreaks = travel_data.get("citybreaks_top", [])[:3]
+            travel_roadtrips = travel_data.get("roadtrips_top", [])[:3]
+        except Exception as e:
+            print(f"  ⚠ Erreur génération voyages : {e}")
+
+    # Calendrier des 4 prochaines vacances
+    upcoming_vacations = vacations[:4]
+
     if result.get("error"):
         return render_template("index.html",
                                error=result["error"],
@@ -90,6 +137,13 @@ def index():
                                show_restaurants=False,
                                is_vacation=False,
                                travel={},
+                               is_vacation_soon=is_vacation_soon,
+                               next_vacation=next_vacation,
+                               days_until_vacation=days_until_vacation,
+                               cheap_flights=cheap_flights,
+                               travel_citybreaks=travel_citybreaks,
+                               travel_roadtrips=travel_roadtrips,
+                               upcoming_vacations=upcoming_vacations,
                                generated_at=result.get("generated_at"))
 
     # Suggestions structurées (déjà parsées depuis JSON)
@@ -123,6 +177,13 @@ def index():
                            show_restaurants=show_restaurants,
                            is_vacation=is_vacation,
                            travel=result.get("travel", {}),
+                           is_vacation_soon=is_vacation_soon,
+                           next_vacation=next_vacation,
+                           days_until_vacation=days_until_vacation,
+                           cheap_flights=cheap_flights,
+                           travel_citybreaks=travel_citybreaks,
+                           travel_roadtrips=travel_roadtrips,
+                           upcoming_vacations=upcoming_vacations,
                            generated_at=result["generated_at"])
 
 
